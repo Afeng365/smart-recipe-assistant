@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import requests
@@ -63,6 +64,7 @@ def run_edit(path: str, old_text: str, new_text: str) -> str:
         return f"Edited {path}"
     except Exception as e:
         return f"Error: {e}"
+
 
 # ────────────────────────────── TheMealDB ──────────────────────────────
 
@@ -257,11 +259,23 @@ NATIVE_HANDLERS = {
 }
 
 NATIVE_TOOLS = [
+    {"name": "bash", "description": "Run a shell command.",
+     "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
+    {"name": "read_file", "description": "Read file contents.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "limit": {"type": "integer"}},
+                      "required": ["path"]}},
+    {"name": "write_file", "description": "Write content to file.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                      "required": ["path", "content"]}},
+    {"name": "edit_file", "description": "Replace exact text in file.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "old_text": {"type": "string"},
+                                                       "new_text": {"type": "string"}},
+                      "required": ["path", "old_text", "new_text"]}},
     {"name": "save_memory", "description": "Save a persistent memory that survives across sessions.",
      "input_schema": {"type": "object", "properties": {
          "name": {"type": "string", "description": "Short identifier (e.g. prefer_tabs, db_schema)"},
          "description": {"type": "string", "description": "One-line summary of what this memory captures"},
-         "type": {"type": "string", "enum": ["user", "feedback", "project", "reference"],
+         "type": {"type": "string", "enum": ["user", "feedback", "project", "reference", "repetitive_behaviors"],
                   "description": "user=dietary preferences, country/region, feedback=corrections, project=non-obvious project conventions or decision reasons, reference=external resource pointers"},
          "content": {"type": "string", "description": "Full memory content (multi-line OK)"},
      }, "required": ["name", "description", "type", "content"]}},

@@ -316,7 +316,6 @@ class RecipeAgent:
           - type=final:   { "answer": str, "data": {"meals":[],"drinks":[]} }
         """
         system_prompt = prompt_builder.build()
-        print(system_prompt)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},

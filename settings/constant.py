@@ -36,7 +36,7 @@ RUNTIME_DIR.mkdir(exist_ok=True)
 STALL_THRESHOLD_S = 45  # seconds before a task is considered stalled
 
 # Persisted-output: large tool outputs written to disk, replaced with preview marker
-CONTEXT_LIMIT = 50000
+CONTEXT_LIMIT = 80000
 KEEP_RECENT_TOOL_RESULTS = 3
 PERSIST_THRESHOLD = 30000
 PREVIEW_CHARS = 2000
