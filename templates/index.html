@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能食谱助手</title>
+<style>
+  /* ── CSS Variables ── */
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #1a2332;
+    --bg-input: #1e293b;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #06b6d4;
+    --accent-glow: rgba(6, 182, 212, 0.25);
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --border: #1e293b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+
+  /* ── Header ── */
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-green));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .header .status {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .header .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    display: inline-block;
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Chat Container ── */
+  .chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  /* ── Message Bubbles ── */
+  .message {
+    max-width: 780px;
+    width: 100%;
+    margin: 0 auto;
+    animation: msg-in 0.35s ease-out;
+  }
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .message.user {
+    align-self: flex-end;
+    margin-left: auto;
+  }
+  .message.user .bubble {
+    background: linear-gradient(135deg, #0891b2, #0d9488);
+    color: #fff;
+    border-radius: 16px 16px 4px 16px;
+    margin-left: auto;
+    width: fit-content;
+    max-width: 70%;
+    padding: 12px 18px;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 2px 12px rgba(6, 182, 212, 0.15);
+  }
+  .message.assistant .bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px 16px 16px 4px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 16px 20px;
+    font-size: 14px;
+    line-height: 1.7;
+    box-shadow: var(--shadow);
+  }
+  .message .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    padding: 0 4px;
+  }
+  .message.user .label { text-align: right; }
+  .message.assistant p { margin-bottom: 8px; }
+  .message.assistant p:last-child { margin-bottom: 0; }
+  .message.assistant strong { color: var(--accent); }
+  .message.assistant ul, .message.assistant ol { padding-left: 20px; margin: 6px 0; }
+  .message.assistant li { margin-bottom: 4px; }
+
+  /* ── Recipe Cards ── */
+  .recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .recipe-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: card-in 0.4s ease-out;
+  }
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .recipe-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+  .recipe-card img {
+    width: 100%; height: 180px;
+    object-fit: cover; display: block;
+    border-bottom: 1px solid var(--border);
+  }
+  .recipe-card-body { padding: 14px 16px 16px; }
+  .recipe-card-body h3 {
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 8px; color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .recipe-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .recipe-tag {
+    font-size: 11px; padding: 2px 10px; border-radius: 20px;
+    background: rgba(6, 182, 212, 0.12); color: var(--accent);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+  }
+  .recipe-tag.green { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); border-color: rgba(16, 185, 129, 0.2); }
+  .recipe-tag.orange { background: rgba(245, 158, 11, 0.12); color: var(--accent-orange); border-color: rgba(245, 158, 11, 0.2); }
+  .recipe-ingredients { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+  .recipe-ingredients summary { cursor: pointer; font-size: 12px; color: var(--accent); margin-bottom: 4px; user-select: none; }
+  .recipe-ingredients ul { padding-left: 16px; margin-top: 4px; }
+  .recipe-ingredients li { margin-bottom: 2px; }
+
+  /* ================================================================
+     PROCESSING / SLIDESHOW VIEW
+     ================================================================ */
+  .processing {
+    max-width: 780px;
+    width: 100%;
+    margin: 0 auto;
+    animation: msg-in 0.35s ease-out;
+  }
+  .processing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .processing-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .processing-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(16,185,129,0.2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .processing-title {
+    font-size: 15px; font-weight: 600;
+  }
+  .processing-title small {
+    font-size: 12px; font-weight: 400;
+    color: var(--text-muted);
+    display: block; margin-top: 2px;
+  }
+
+  /* ── Timeline ── */
+  .timeline { position: relative; padding-left: 8px; }
+  .timeline-step {
+    display: flex; gap: 14px;
+    padding: 8px 0;
+    opacity: 0; transform: translateX(-8px);
+    animation: step-in 0.4s ease-out forwards;
+  }
+  @keyframes step-in {
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .step-indicator {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+  .step-indicator.pending {
+    background: rgba(6, 182, 212, 0.12);
+    border: 2px solid var(--accent);
+    animation: spin-indicator 1s linear infinite;
+  }
+  @keyframes spin-indicator {
+    0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+    50% { box-shadow: 0 0 0 6px transparent; }
+    100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  }
+  .step-indicator.done {
+    background: rgba(16, 185, 129, 0.15);
+    border: 2px solid var(--accent-green);
+  }
+  .step-indicator.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 2px solid #ef4444;
+  }
+  .step-body { flex: 1; min-width: 0; padding-top: 3px; }
+  .step-title {
+    font-size: 13px; font-weight: 500;
+    color: var(--text-primary);
+  }
+  .step-title .func-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px; color: var(--accent);
+    background: rgba(6, 182, 212, 0.08);
+    padding: 1px 8px; border-radius: 4px;
+    margin-left: 6px;
+  }
+  .step-detail {
+    font-size: 12px; color: var(--text-muted);
+    margin-top: 2px; line-height: 1.5;
+  }
+  .step-result {
+    font-size: 12px; color: var(--accent-green);
+    margin-top: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .step-result.error { color: #ef4444; }
+  .step-duration {
+    font-size: 11px; color: var(--text-muted);
+  }
+
+  /* ── Connecting dots ── */
+  .connecting-dots {
+    display: flex; align-items: center; gap: 4px;
+    padding: 8px 0 8px 42px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .connecting-dots .dots span {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin: 0 2px;
+    animation: dot-bounce 1.4s infinite;
+  }
+  .connecting-dots .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .connecting-dots .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-4px); }
+  }
+
+  /* ── Empty State ── */
+  .empty-state {
+    text-align: center; margin: auto; padding: 40px 20px; max-width: 480px;
+  }
+  .empty-state .icon { font-size: 56px; margin-bottom: 16px; }
+  .empty-state h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-green));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .empty-state p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+  .empty-state .hints {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px;
+  }
+  .empty-state .hint {
+    font-size: 12px; padding: 6px 14px; border-radius: 20px;
+    background: var(--bg-input); color: var(--text-secondary);
+    border: 1px solid var(--border); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .empty-state .hint:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(6, 182, 212, 0.08);
+  }
+
+  /* ── Input Area ── */
+  .input-area {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 14px 24px;
+    flex-shrink: 0;
+  }
+  .input-wrap {
+    max-width: 780px; margin: 0 auto;
+    display: flex; gap: 10px; align-items: flex-end;
+  }
+  .input-wrap textarea {
+    flex: 1;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 12px 16px;
+    resize: none; min-height: 48px; max-height: 120px;
+    outline: none; transition: border-color 0.2s; line-height: 1.5;
+  }
+  .input-wrap textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .input-wrap textarea::placeholder { color: var(--text-muted); }
+  .btn-send {
+    width: 48px; height: 48px;
+    border: none; border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent), var(--accent-green));
+    color: #fff; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.2s, transform 0.15s; flex-shrink: 0;
+  }
+  .btn-send:hover { opacity: 0.9; }
+  .btn-send:active { transform: scale(0.95); }
+  .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; }
+    .header h1 { font-size: 16px; }
+    .chat-container { padding: 12px; }
+    .message.assistant .bubble { padding: 14px; }
+    .recipe-grid { grid-template-columns: 1fr; }
+    .input-area { padding: 12px 16px; }
+    .message.user .bubble { max-width: 85%; }
+    .processing-card { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">🍳</div>
+  <h1>智能食谱助手</h1>
+  <div class="status">
+    <span class="status-dot"></span>
+    <span>在线</span>
+  </div>
+</div>
+
+<!-- Chat -->
+<div class="chat-container" id="chatContainer">
+  <div class="empty-state" id="emptyState">
+    <div class="icon">🍽️</div>
+    <h2>今天想吃什么？</h2>
+    <p>搜索菜谱、查询食材、推荐美食和饮品<br>AI 智能助手为你服务</p>
+    <div class="hints">
+      <span class="hint" onclick="sendQuick('今晚用鸡胸肉做一道菜')">🍗 鸡胸肉食谱</span>
+      <span class="hint" onclick="sendQuick('推荐一个意面菜谱')">🍝 意面推荐</span>
+      <span class="hint" onclick="sendQuick('用Gin调一杯鸡尾酒')">🍸 鸡尾酒</span>
+      <span class="hint" onclick="sendQuick('有什么甜品推荐？')">🍰 甜品推荐</span>
+    </div>
+  </div>
+</div>
+
+<!-- Input -->
+<div class="input-area">
+  <div class="input-wrap">
+    <textarea id="inputBox" rows="1" placeholder="输入你想做的菜或食材..."
+      onkeydown="onInputKeydown(event)" oninput="autoResize(this)"></textarea>
+    <button class="btn-send" id="sendBtn" onclick="sendMessage()" disabled>↵</button>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let isLoading = false;
+
+// ── Auto-resize ──
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  document.getElementById('sendBtn').disabled = !el.value.trim() || isLoading;
+}
+
+// ── Quick send ──
+function sendQuick(text) {
+  const input = document.getElementById('inputBox');
+  input.value = text;
+  autoResize(input);
+  sendMessage();
+}
+
+// ── Input keydown ──
+function onInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+// ── Send message ──
+function sendMessage() {
+  const input = document.getElementById('inputBox');
+  const text = input.value.trim();
+  if (!text || isLoading) return;
+
+  input.value = '';
+  autoResize(input);
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  // Remove empty state
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+
+  // Add user message
+  addUserMessage(text);
+
+  // Show processing slideshow
+  const procId = showProcessing();
+
+  // Connect SSE
+  const url = `/api/chat/stream?message=${encodeURIComponent(text)}`;
+  const es = new EventSource(url);
+
+  let toolStepIdx = 0;
+
+  es.addEventListener('thinking', (e) => {
+    const data = JSON.parse(e.data);
+    setThinkingText(data.content || '正在分析...');
+  });
+
+  es.addEventListener('tool_call', (e) => {
+    const data = JSON.parse(e.data);
+    addToolStep(procId, toolStepIdx++, data);
+  });
+
+  es.addEventListener('tool_result', (e) => {
+    const data = JSON.parse(e.data);
+    completeToolStep(procId, data);
+  });
+
+  es.addEventListener('final', (e) => {
+    const data = JSON.parse(e.data);
+    es.close();
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+
+    // Slideshow → 最终结果过渡
+    finishProcessing(procId, data);
+  });
+
+  es.addEventListener('error', (e) => {
+    // EventSource 会在连接关闭时自动触发 error
+    if (es.readyState === EventSource.CLOSED) {
+      es.close();
+      isLoading = false;
+      document.getElementById('sendBtn').disabled = false;
+    }
+  });
+}
+
+// ── User message ──
+function addUserMessage(text) {
+  const container = document.getElementById('chatContainer');
+  const div = document.createElement('div');
+  div.className = 'message user';
+  div.innerHTML = `<div class="label">你</div><div class="bubble">${escapeHtml(text)}</div>`;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
+// ── Processing Slideshow ──
+function showProcessing() {
+  const container = document.getElementById('chatContainer');
+  const id = 'proc-' + Date.now();
+
+  const div = document.createElement('div');
+  div.className = 'processing';
+  div.id = id;
+  div.innerHTML = `
+    <div class="processing-card">
+      <div class="processing-header">
+        <div class="processing-icon">🧠</div>
+        <div class="processing-title">
+          食谱助手思考中
+          <small id="${id}-thinking">正在分析你的问题...</small>
+        </div>
+      </div>
+      <div class="timeline" id="${id}-timeline"></div>
+      <div class="connecting-dots" id="${id}-dots">
+        <span style="font-size:12px;">处理中</span>
+        <span class="dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>`;
+
+  container.appendChild(div);
+  scrollToBottom();
+  return id;
+}
+
+function setThinkingText(text) {
+  // Update the thinking text in the header
+  // But only the first line or a short version
+  const firstLine = text.split('\n')[0].trim();
+  // Find the active processing card
+  const el = document.querySelector('.processing:last-child small[id$="-thinking"]');
+  if (el) el.textContent = firstLine.length > 60 ? firstLine.slice(0, 60) + '...' : firstLine;
+}
+
+function addToolStep(procId, idx, data) {
+  const timeline = document.getElementById(procId + '-timeline');
+  if (!timeline) return;
+
+  const funcName = data.name || 'unknown';
+  const args = data.arguments || {};
+  const argStr = Object.values(args).filter(v => v).join(', ');
+
+  const step = document.createElement('div');
+  step.className = 'timeline-step';
+  step.id = procId + '-step-' + idx;
+  step.style.animationDelay = (idx * 0.08) + 's';
+  step.innerHTML = `
+    <div class="step-indicator pending" id="${procId}-indicator-${idx}">🔧</div>
+    <div class="step-body">
+      <div class="step-title">
+        正在调用
+        <span class="func-name">${escapeHtml(funcName)}</span>
+      </div>
+      <div class="step-detail">${escapeHtml(argStr)}</div>
+    </div>`;
+
+  timeline.appendChild(step);
+  scrollToBottom();
+}
+
+function completeToolStep(procId, data) {
+  // Find the matching step by function name — pick the last "pending" one
+  const prefix = procId + '-step-';
+  let maxIdx = -1;
+  const timeline = document.getElementById(procId + '-timeline');
+  if (!timeline) return;
+
+  // Iterate steps in reverse to find the last pending one for this function
+  const steps = timeline.querySelectorAll('.timeline-step');
+  let targetStep = null;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const indicator = steps[i].querySelector('.step-indicator.pending');
+    if (indicator) {
+      targetStep = steps[i];
+      break;
+    }
+  }
+  if (!targetStep) return;
+
+  const indicator = targetStep.querySelector('.step-indicator');
+  const body = targetStep.querySelector('.step-body');
+
+  // Update indicator
+  indicator.className = 'step-indicator done';
+  indicator.textContent = data.summary && data.summary.includes('❌') ? '❌' : '✅';
+  if (data.summary && data.summary.includes('❌')) {
+    indicator.className = 'step-indicator error';
+  }
+
+  // Add result line
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'step-result' + (data.summary && data.summary.includes('❌') ? ' error' : '');
+  const durText = data.duration ? `<span class="step-duration">(${data.duration}s)</span>` : '';
+  resultDiv.innerHTML = `${escapeHtml(data.summary || '已完成')} ${durText}`;
+  body.appendChild(resultDiv);
+
+  scrollToBottom();
+}
+
+function finishProcessing(procId, data) {
+  const procEl = document.getElementById(procId);
+  if (!procEl) return;
+
+  const container = document.getElementById('chatContainer');
+
+  // Slide out — fade + shrink
+  procEl.style.transition = 'all 0.4s ease-out';
+  procEl.style.opacity = '0';
+  procEl.style.transform = 'scale(0.97)';
+  procEl.style.maxHeight = procEl.scrollHeight + 'px';
+
+  setTimeout(() => {
+    procEl.remove();
+
+    // Show final answer
+    const answer = data.answer || '';
+    addAssistantMessage(answer);
+
+    // Show recipe/drink cards
+    if (data.data && (data.data.meals?.length || data.data.drinks?.length)) {
+      renderDataCards(data.data);
+    }
+
+    scrollToBottom();
+  }, 450);
+}
+
+// ── Assistant message ──
+function addAssistantMessage(text) {
+  const container = document.getElementById('chatContainer');
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.innerHTML = `<div class="label">🧠 食谱助手</div><div class="bubble">${renderMarkdown(text)}</div>`;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
+// ── Render recipe/drink cards ──
+function renderDataCards(data) {
+  const container = document.getElementById('chatContainer');
+  const meals = (data.meals || []).filter(m => m && m.strMeal);
+  const drinks = (data.drinks || []).filter(d => d && d.strDrink);
+
+  if (meals.length === 0 && drinks.length === 0) return;
+
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.style.animation = 'msg-in 0.35s ease-out';
+
+  let html = '<div class="bubble" style="width:100%;max-width:100%;">';
+
+  if (meals.length > 0) {
+    html += `<p style="margin-bottom:10px;font-weight:600;font-size:15px;">🍽️ 菜谱 (${meals.length})</p>`;
+    html += '<div class="recipe-grid">';
+    for (const meal of meals.slice(0, 6)) {
+      html += renderMealCard(meal);
+    }
+    html += '</div>';
+    if (meals.length > 6) {
+      html += `<p style="color:var(--text-muted);font-size:12px;margin-top:6px;">...及其他 ${meals.length - 6} 个结果</p>`;
+    }
+  }
+
+  if (drinks.length > 0) {
+    if (meals.length > 0) html += '<hr style="border-color:var(--border);margin:16px 0;">';
+    html += `<p style="margin-bottom:10px;font-weight:600;font-size:15px;">🍸 饮品 (${drinks.length})</p>`;
+    html += '<div class="recipe-grid">';
+    for (const drink of drinks.slice(0, 6)) {
+      html += renderDrinkCard(drink);
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  div.innerHTML = html;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
+// ── Meal card ──
+function renderMealCard(meal) {
+  const ingredients = extractIngredients(meal, 20);
+  const tags = [];
+  if (meal.strCategory) tags.push({ text: meal.strCategory, cls: '' });
+  if (meal.strArea) tags.push({ text: meal.strArea, cls: 'green' });
+
+  const thumb = meal.strMealThumb ? meal.strMealThumb + '/preview' : '';
+  const fallbackImg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" fill="%231a2332"%3E%3Crect width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" fill="%2364748b" font-size="14" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+
+  return `
+    <div class="recipe-card">
+      <img src="${thumb || fallbackImg}"
+           alt="${escapeHtml(meal.strMeal || '')}" loading="lazy"
+           onerror="this.src='${fallbackImg}'">
+      <div class="recipe-card-body">
+        <h3>${escapeHtml(meal.strMeal || '')}</h3>
+        <div class="recipe-tags">
+          ${tags.map(t => `<span class="recipe-tag ${t.cls}">${escapeHtml(t.text)}</span>`).join('')}
+          ${(meal.strTags || '').split(',').slice(0,2).filter(Boolean).map(t =>
+            `<span class="recipe-tag orange">${escapeHtml(t.trim())}</span>`
+          ).join('')}
+        </div>
+        <details class="recipe-ingredients">
+          <summary>📋 食材清单 (${ingredients.length})</summary>
+          <ul>${ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+        </details>
+      </div>
+    </div>`;
+}
+
+// ── Drink card ──
+function renderDrinkCard(drink) {
+  const ingredients = extractIngredients(drink, 15);
+  const tags = [];
+  if (drink.strCategory) tags.push({ text: drink.strCategory, cls: '' });
+  if (drink.strGlass) tags.push({ text: drink.strGlass, cls: 'green' });
+  if (drink.strAlcoholic && drink.strAlcoholic !== 'Optional alcohol') {
+    tags.push({ text: drink.strAlcoholic, cls: 'orange' });
+  }
+
+  const thumb = drink.strDrinkThumb ? drink.strDrinkThumb + '/preview' : '';
+  const fallbackImg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" fill="%231a2332"%3E%3Crect width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" fill="%2364748b" font-size="14" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+
+  return `
+    <div class="recipe-card">
+      <img src="${thumb || fallbackImg}"
+           alt="${escapeHtml(drink.strDrink || '')}" loading="lazy"
+           onerror="this.src='${fallbackImg}'">
+      <div class="recipe-card-body">
+        <h3>${escapeHtml(drink.strDrink || '')}</h3>
+        <div class="recipe-tags">
+          ${tags.map(t => `<span class="recipe-tag ${t.cls}">${escapeHtml(t.text)}</span>`).join('')}
+        </div>
+        <details class="recipe-ingredients">
+          <summary>📋 配料清单 (${ingredients.length})</summary>
+          <ul>${ingredients.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>
+        </details>
+      </div>
+    </div>`;
+}
+
+// ── Extract ingredients ──
+function extractIngredients(obj, max) {
+  const items = [];
+  for (let i = 1; i <= max; i++) {
+    const ing = obj['strIngredient' + i];
+    const measure = obj['strMeasure' + i];
+    if (ing && ing.trim()) {
+      items.push((measure && measure.trim()) ? `${ing.trim()} ${measure.trim()}` : ing.trim());
+    }
+  }
+  return items;
+}
+
+// ── Markdown render ──
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+  html = html.replace(/^### (.*$)/gm, '<h4>$1</h4>');
+  html = html.replace(/^## (.*$)/gm, '<h3>$1</h3>');
+  html = html.replace(/^# (.*$)/gm, '<h2>$1</h2>');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  html = html.replace(/`([^`]+)`/g, '<code style="background:var(--bg-input);padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--accent);">$1</a>');
+  const paragraphs = html.split(/\n\s*\n/);
+  html = paragraphs.map(p => {
+    const trimmed = p.trim();
+    if (!trimmed) return '';
+    if (trimmed.match(/^(\d+\.|-|\*)\s/m)) return trimmed;
+    return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+  return html;
+}
+
+// ── Escape HTML ──
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ── Scroll ──
+function scrollToBottom() {
+  const container = document.getElementById('chatContainer');
+  requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+}
+
+// ── Input watcher ──
+document.getElementById('inputBox').addEventListener('input', function() {
+  document.getElementById('sendBtn').disabled = !this.value.trim() || isLoading;
+});
+
+window.addEventListener('load', () => {
+  document.getElementById('inputBox').focus();
+});
+</script>
+
+</body>
+</html>
