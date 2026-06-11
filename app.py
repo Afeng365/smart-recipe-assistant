@@ -100,6 +100,5 @@ def _deduplicate(items: list[dict], key: str) -> list[dict]:
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
-    logging.info("启动 Web 服务, 端口: %d, debug: %s", port, debug)
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    logging.info("启动 Web 服务, 端口: %d", port)
+    app.run(host="0.0.0.0", port=port, debug=False)
