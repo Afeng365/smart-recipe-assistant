@@ -64,6 +64,7 @@ def run_edit(path: str, old_text: str, new_text: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
+
 # ────────────────────────────── TheMealDB ──────────────────────────────
 
 def search_meals(name: str) -> list[dict]:
@@ -257,6 +258,18 @@ NATIVE_HANDLERS = {
 }
 
 NATIVE_TOOLS = [
+    {"name": "bash", "description": "Run a shell command.",
+     "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
+    {"name": "read_file", "description": "Read file contents.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "limit": {"type": "integer"}},
+                      "required": ["path"]}},
+    {"name": "write_file", "description": "Write content to file.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                      "required": ["path", "content"]}},
+    {"name": "edit_file", "description": "Replace exact text in file.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "old_text": {"type": "string"},
+                                                       "new_text": {"type": "string"}},
+                      "required": ["path", "old_text", "new_text"]}},
     {"name": "save_memory", "description": "Save a persistent memory that survives across sessions.",
      "input_schema": {"type": "object", "properties": {
          "name": {"type": "string", "description": "Short identifier (e.g. prefer_tabs, db_schema)"},
