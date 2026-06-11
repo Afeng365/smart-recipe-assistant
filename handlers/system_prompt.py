@@ -6,20 +6,69 @@ from pathlib import Path
 from settings.constant import MODEL, WORKDIR, DYNAMIC_BOUNDARY
 
 MEMORY_GUIDANCE = """
-When to save memories:
-- User states a preference ("I like tabs", "always use pytest") -> type: user
-- User corrects you ("don't do X", "that was wrong because...") -> type: feedback
-- You learn a project fact that is not easy to infer from current code alone
-  (for example: a rule exists because of compliance, or a legacy module must
-  stay untouched for business reasons) -> type: project
-- You learn where an external resource lives (ticket board, dashboard, docs URL)
-- Information such as user's dietary preferences, country/region, and local eating habits
-  -> type: reference
+应该保存到长期记忆save memories的内容：
+ 1. 用户画像
 
-When NOT to save:
-- Anything easily derivable from code (function signatures, file structure, directory layout)
-- Temporary task state (current branch, open PR numbers, current TODOs)
-- Secrets or credentials (API keys, passwords)
+  ┌───────────────┬──────────────────────────────────┐
+  │     内容      │               示例               │
+  ├───────────────┼──────────────────────────────────┤
+  │ 饮食限制/禁忌 │ 清真、素食、麸质过敏、坚果过敏   │
+  ├───────────────┼──────────────────────────────────┤
+  │ 健康目标      │ 减脂、增肌、控糖、低钠饮食       │
+  ├───────────────┼──────────────────────────────────┤
+  │ 口味偏好      │ 喜欢辣/清淡/酸甜，厌恶香菜/内脏  │
+  ├───────────────┼──────────────────────────────────┤
+  │ 厨艺水平      │ 新手/中级/进阶（影响推荐复杂度） │
+  ├───────────────┼──────────────────────────────────┤
+  │ 常用厨具      │ 有空气炸锅、慢炖锅、蒸烤箱等     │
+  └───────────────┴──────────────────────────────────┘
+
+  2. 重复性行为模式
+
+  - 常做的菜系（用户总做川菜 → 偏好辣）
+  - 做饭时间规律（工作日30分钟快手菜，周末可花2小时）
+  - 常批量购买的食材（冰箱总有鸡胸肉）
+
+  3. 历史反馈
+
+  - 对推荐菜品的评价（"太油了"、"步骤太复杂"、"孩子很喜欢"）
+  - 拒绝/修改过的建议模式
+
+  4. 家庭/用餐场景
+
+  - 几人份（常做2人份 vs 家庭4人份）
+  - 有无小孩（需考虑儿童口味）
+  - 招待场景偏好
+-> type: reference
+
+
+不应该保存到长期记忆的内容, When NOT to save memories:：
+  1. 单次/临时性信息
+
+  ┌──────────────────────────┬────────────────────────────┐
+  │           例子           │            原因            │
+  ├──────────────────────────┼────────────────────────────┤
+  │ "今晚想吃鱼"             │ 这是单次请求，不是长期偏好 │
+  ├──────────────────────────┼────────────────────────────┤
+  │ "冰箱里有西兰花快过期了" │ 食材库存动态变化           │
+  ├──────────────────────────┼────────────────────────────┤
+  │ "明天有朋友来家吃饭"     │ 一次性事件                 │
+  └──────────────────────────┴────────────────────────────┘
+
+  2. 可推导/冗余信息
+
+  - 用户每次问"低卡食谱" → 不需要重复保存"用户关注卡路里"，因为行为模式已经足够确定
+  - 用户说"不要猪肉" + "不要牛肉" → 直接推断可能是穆斯林，保存"清真饮食"一条就够了
+
+  3. 不明确的/单次反馈
+
+  - "这个菜一般" → 不保存，除非多次针对同类型菜品给出类似反馈
+  - "今天不想吃辣的" → 单日情绪，不覆盖辣味偏好记忆
+
+  4. 菜谱本身的内容
+
+  - 具体菜谱的步骤、配料 → Git/代码里有，不需要存记忆
+  - 用户问过的某个菜的历史 → 如果用户再问可以用代码检索，存记忆浪费空间
 """
 
 

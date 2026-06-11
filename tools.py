@@ -275,7 +275,7 @@ NATIVE_TOOLS = [
      "input_schema": {"type": "object", "properties": {
          "name": {"type": "string", "description": "Short identifier (e.g. prefer_tabs, db_schema)"},
          "description": {"type": "string", "description": "One-line summary of what this memory captures"},
-         "type": {"type": "string", "enum": ["user", "feedback", "project", "reference"],
+         "type": {"type": "string", "enum": ["user", "feedback", "project", "reference", "repetitive_behaviors"],
                   "description": "user=dietary preferences, country/region, feedback=corrections, project=non-obvious project conventions or decision reasons, reference=external resource pointers"},
          "content": {"type": "string", "description": "Full memory content (multi-line OK)"},
      }, "required": ["name", "description", "type", "content"]}},

@@ -41,29 +41,6 @@ class MemoryManager:
         if count > 0:
             logging.info(f"[Memory loaded: {count} memories from {self.memory_dir}]")
 
-    # def load_memory_prompt(self) -> str:
-    #     """Build a memory section for injection into the system prompt."""
-    #     if not self.memories:
-    #         return ""
-    #
-    #     sections = []
-    #     sections.append("# Memories (persistent across sessions)")
-    #     sections.append("")
-    #
-    #     # Group by type for readability
-    #     for mem_type in MEMORY_TYPES:
-    #         typed = {k: v for k, v in self.memories.items() if v["type"] == mem_type}
-    #         if not typed:
-    #             continue
-    #         sections.append(f"## [{mem_type}]")
-    #         for name, mem in typed.items():
-    #             sections.append(f"### {name}: {mem['description']}")
-    #             if mem["content"].strip():
-    #                 sections.append(mem["content"].strip())
-    #             sections.append("")
-    #
-    #     return "\n".join(sections)
-
     def save_memory(self, name: str, description: str, mem_type: str, content: str) -> str:
         """
         Save a memory to disk and update the index.
