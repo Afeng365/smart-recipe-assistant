@@ -5,20 +5,19 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# ChromaDB client singleton (shared across all KB collections)
-_client = None
+# ChromaDB client cache (one per persist_dir)
+_clients: Dict[str, "chromadb.PersistentClient"] = {}
 
 
 def _get_client(persist_dir: str) -> "chromadb.PersistentClient":
-    """Get or create a shared ChromaDB PersistentClient."""
-    global _client
-    if _client is None:
+    """Get or create a ChromaDB PersistentClient (cached per persist_dir)."""
+    if persist_dir not in _clients:
         import chromadb
-        _client = chromadb.PersistentClient(
+        _clients[persist_dir] = chromadb.PersistentClient(
             path=persist_dir,
             settings=chromadb.Settings(anonymized_telemetry=False),
         )
-    return _client
+    return _clients[persist_dir]
 
 
 class VectorStore:
