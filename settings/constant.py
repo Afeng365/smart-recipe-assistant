@@ -86,3 +86,19 @@ VALID_MSG_TYPES = {
     "plan_approval",
     "plan_approval_response",
 }
+
+# ── 知识库配置 ──────────────────────────────────────────────────────────
+
+KB_ROOT_PATH = WORKDIR / "data" / "knowledge_base"
+KB_DB_PATH = KB_ROOT_PATH / "info.db"
+KB_CONTENT_DIR_NAME = "content"
+KB_CHROMA_DIR_NAME = "chroma"
+KB_DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
+KB_DEFAULT_CHUNK_SIZE = 500
+KB_DEFAULT_CHUNK_OVERLAP = 50
+KB_DEFAULT_TOP_K = 3
+KB_DEFAULT_SCORE_THRESHOLD = 0.3
+KB_MAX_FILE_SIZE_MB = 50
+KB_MAX_FILE_SIZE_BYTES = KB_MAX_FILE_SIZE_MB * 1024 * 1024
+KB_SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx", ".json")
+KB_VALID_NAME_PATTERN = r"^[一-龥a-zA-Z0-9_\-]+$"
