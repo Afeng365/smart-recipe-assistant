@@ -416,3 +416,140 @@ class TestFormatSearchResults:
         # Results are formatted as-is (sorting is done upstream)
         assert "内容A" in text
         assert "内容B" in text
+
+
+class TestKnowledgeBaseManager:
+    """Integration tests for KB manager (uses real ChromaDB + embedding model)."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        import sys as _sys
+        import tempfile
+        import handlers.knowledge_base.db as db_mod
+        from settings import constant
+        self._orig_kb_root = constant.KB_ROOT_PATH
+        self._orig_kb_db = constant.KB_DB_PATH
+        self.tmpdir = Path(tempfile.mkdtemp())
+        constant.KB_ROOT_PATH = self.tmpdir
+        constant.KB_DB_PATH = self.tmpdir / "info.db"
+        db_mod.db_path = constant.KB_DB_PATH
+        # Override kb_manager module-level constants.
+        # NOTE: __init__.py shadows the module with the singleton instance,
+        # so we access the module via sys.modules.
+        km_mod = _sys.modules["handlers.knowledge_base.kb_manager"]
+        km_mod.KB_ROOT_PATH = self.tmpdir
+        km_mod.KB_DB_PATH = self.tmpdir / "info.db"
+        # Reset VectorStore client singleton to force fresh ChromaDB
+        import handlers.knowledge_base.vector_store as vs_mod
+        vs_mod._client = None
+        from handlers.knowledge_base.kb_manager import KnowledgeBaseManager
+        self.mgr = KnowledgeBaseManager()
+        self.mgr._init_lock = False
+        yield
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        constant.KB_ROOT_PATH = self._orig_kb_root
+        constant.KB_DB_PATH = self._orig_kb_db
+        db_mod.db_path = self._orig_kb_db
+        km_mod.KB_ROOT_PATH = self._orig_kb_root
+        km_mod.KB_DB_PATH = self._orig_kb_db
+
+    def test_create_and_list_kb(self):
+        info = self.mgr.create_kb("test_kb", "测试知识库")
+        assert info["name"] == "test_kb"
+        assert info["description"] == "测试知识库"
+        kbs = self.mgr.list_kbs()
+        assert len(kbs) == 1
+
+    def test_create_duplicate_kb_raises(self):
+        self.mgr.create_kb("test_kb")
+        with pytest.raises(ValueError, match="已存在"):
+            self.mgr.create_kb("test_kb")
+
+    def test_invalid_kb_name(self):
+        with pytest.raises(ValueError):
+            self.mgr.create_kb("invalid/name")
+        with pytest.raises(ValueError):
+            self.mgr.create_kb("invalid\\name")
+        with pytest.raises(ValueError):
+            self.mgr.create_kb("")
+
+    def test_get_kb(self):
+        self.mgr.create_kb("test_kb")
+        assert self.mgr.get_kb("test_kb") is not None
+        assert self.mgr.get_kb("nonexistent") is None
+
+    def test_delete_kb(self):
+        self.mgr.create_kb("test_kb")
+        self.mgr.delete_kb("test_kb")
+        assert len(self.mgr.list_kbs()) == 0
+
+    def test_delete_nonexistent_kb_raises(self):
+        with pytest.raises(ValueError, match="不存在"):
+            self.mgr.delete_kb("nonexistent")
+
+    def test_add_documents_txt(self):
+        self.mgr.create_kb("test_kb")
+        f = self.tmpdir / "recipe.txt"
+        f.write_text("红烧肉做法：五花肉焯水后加入冰糖炒色，小火炖40分钟。", encoding="utf-8")
+        chunk_count = self.mgr.add_documents("test_kb", [f])
+        assert chunk_count >= 1
+        docs = self.mgr.list_documents("test_kb")
+        assert len(docs) == 1
+        assert docs[0]["filename"] == "recipe.txt"
+
+    def test_add_documents_md(self):
+        self.mgr.create_kb("test_kb")
+        f = self.tmpdir / "recipe.md"
+        f.write_text("# 麻婆豆腐\n\n## 食材\n豆腐、牛肉末、豆瓣酱\n\n## 做法\n1. 炒肉末\n2. 加豆瓣酱\n3. 烧豆腐", encoding="utf-8")
+        chunk_count = self.mgr.add_documents("test_kb", [f])
+        assert chunk_count >= 1
+
+    def test_remove_documents(self):
+        self.mgr.create_kb("test_kb")
+        f = self.tmpdir / "recipe.txt"
+        f.write_text("红烧肉做法", encoding="utf-8")
+        self.mgr.add_documents("test_kb", [f])
+        self.mgr.remove_documents("test_kb", ["recipe.txt"])
+        docs = self.mgr.list_documents("test_kb")
+        assert len(docs) == 0
+
+    def test_add_documents_unsupported_format(self):
+        self.mgr.create_kb("test_kb")
+        f = self.tmpdir / "data.bin"
+        f.write_bytes(b"\x00\x01\x02")
+        with pytest.raises(ValueError, match="不支持"):
+            self.mgr.add_documents("test_kb", [f])
+
+    def test_add_documents_kb_not_found(self):
+        f = self.tmpdir / "recipe.txt"
+        f.write_text("test")
+        with pytest.raises(ValueError, match="不存在"):
+            self.mgr.add_documents("nonexistent", [f])
+
+    def test_list_documents_kb_not_found(self):
+        with pytest.raises(ValueError, match="不存在"):
+            self.mgr.list_documents("nonexistent")
+
+    def test_full_workflow_with_search(self):
+        """End-to-end: create KB -> add doc -> search -> delete KB."""
+        from handlers.knowledge_base.search import search_knowledge_base
+
+        self.mgr.create_kb("test_kb")
+        f = self.tmpdir / "recipes.txt"
+        f.write_text(
+            "红烧肉是一道经典的中式菜肴。主要食材包括五花肉、冰糖、老抽、料酒。"
+            "做法是先将五花肉焯水，然后用冰糖炒糖色，加入调料炖煮40分钟。",
+            encoding="utf-8",
+        )
+        self.mgr.add_documents("test_kb", [f])
+
+        results = search_knowledge_base("红烧肉怎么做", kb_name="test_kb", top_k=2)
+        assert len(results) >= 1
+        assert "五花肉" in results[0].content
+
+        # Search across all KBs
+        results_all = search_knowledge_base("红烧肉", top_k=2)
+        assert len(results_all) >= 1
+
+        self.mgr.delete_kb("test_kb")
