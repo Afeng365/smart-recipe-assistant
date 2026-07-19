@@ -292,3 +292,95 @@ class TestDocumentLoader:
         text = load_file(f)
         assert "清蒸鱼" in text
         assert "蒸10分钟" in text
+
+
+class TestVectorStore:
+    """Tests for VectorStore with ChromaDB."""
+
+    @pytest.fixture
+    def store(self):
+        from handlers.knowledge_base.vector_store import VectorStore
+        tmpdir = tempfile.mkdtemp()
+        store = VectorStore("test_kb", Path(tmpdir))
+        yield store
+        # Cleanup
+        store.clear()
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_add_and_count(self, store):
+        import random
+        random.seed(42)
+        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        store.add(
+            texts=["文本一", "文本二", "文本三"],
+            metadatas=[
+                {"source": "a.txt", "chunk_index": 0, "kb_name": "test_kb"},
+                {"source": "a.txt", "chunk_index": 1, "kb_name": "test_kb"},
+                {"source": "b.txt", "chunk_index": 0, "kb_name": "test_kb"},
+            ],
+            ids=["c1", "c2", "c3"],
+            embeddings=embeddings,
+        )
+        assert store.count() == 3
+
+    def test_query_returns_results(self, store):
+        import random
+        random.seed(42)
+        vec1 = [random.random() for _ in range(512)]
+        store.add(
+            texts=["红烧肉的做法：五花肉焯水后炖煮"],
+            metadatas=[{"source": "recipe.txt", "chunk_index": 0, "kb_name": "test_kb"}],
+            ids=["c1"],
+            embeddings=[vec1],
+        )
+        # Query with the same vector should return high similarity
+        results = store.query(vec1, top_k=3, score_threshold=0.0)
+        assert len(results) >= 1
+        assert results[0]["score"] > 0.9  # near-exact match
+
+    def test_query_empty_store(self, store):
+        results = store.query([0.1] * 512, top_k=3)
+        assert results == []
+
+    def test_delete_by_ids(self, store):
+        import random
+        random.seed(42)
+        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        store.add(
+            texts=["a", "b", "c"],
+            metadatas=[{"source": "x.txt", "chunk_index": i, "kb_name": "test_kb"} for i in range(3)],
+            ids=["c1", "c2", "c3"],
+            embeddings=embeddings,
+        )
+        store.delete_by_ids(["c1", "c3"])
+        assert store.count() == 1
+
+    def test_delete_by_filter(self, store):
+        import random
+        random.seed(42)
+        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        store.add(
+            texts=["a", "b", "c"],
+            metadatas=[
+                {"source": "a.txt", "chunk_index": 0, "kb_name": "test_kb"},
+                {"source": "b.txt", "chunk_index": 0, "kb_name": "test_kb"},
+                {"source": "a.txt", "chunk_index": 1, "kb_name": "test_kb"},
+            ],
+            ids=["c1", "c2", "c3"],
+            embeddings=embeddings,
+        )
+        store.delete_by_filter({"source": "a.txt"})
+        assert store.count() == 1
+
+    def test_clear(self, store):
+        import random
+        random.seed(42)
+        embeddings = [[random.random() for _ in range(512)] for _ in range(2)]
+        store.add(
+            texts=["a", "b"],
+            metadatas=[{"source": "x.txt", "chunk_index": i, "kb_name": "test_kb"} for i in range(2)],
+            ids=["c1", "c2"],
+            embeddings=embeddings,
+        )
+        store.clear()
+        assert store.count() == 0
