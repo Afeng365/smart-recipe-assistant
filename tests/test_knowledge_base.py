@@ -104,3 +104,52 @@ class TestDB:
         self.db.update_kb_doc_count("test_kb")
         kb = self.db.get_kb_from_db("test_kb")
         assert kb["doc_count"] == 2
+
+
+class TestEmbeddingModel:
+    """Tests for handlers/knowledge_base/embedding.py."""
+
+    def teardown_method(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+
+    def test_singleton(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        a = EmbeddingModel()
+        b = EmbeddingModel()
+        assert a is b
+
+    def test_singleton_different_model_names(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+        a = EmbeddingModel("BAAI/bge-small-zh-v1.5")
+        b = EmbeddingModel("other-model")
+        assert a is b  # singleton ignores second model_name
+
+    def test_lazy_loading(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+        m = EmbeddingModel()
+        assert not m._loaded
+
+    def test_load_and_embed(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+        m = EmbeddingModel()
+        vectors = m.embed(["测试文本", "第二段文本"])
+        assert len(vectors) == 2
+        assert len(vectors[0]) == m.dimension
+        assert m.dimension == 512
+
+    def test_embed_empty_list(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+        m = EmbeddingModel()
+        assert m.embed([]) == []
+
+    def test_embed_query(self):
+        from handlers.knowledge_base.embedding import EmbeddingModel
+        EmbeddingModel.reset()
+        m = EmbeddingModel()
+        vec = m.embed_query("红烧肉怎么做")
+        assert len(vec) == 512
