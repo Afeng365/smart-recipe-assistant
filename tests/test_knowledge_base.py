@@ -384,3 +384,35 @@ class TestVectorStore:
         )
         store.clear()
         assert store.count() == 0
+
+
+class TestFormatSearchResults:
+    """Tests for search result formatting."""
+
+    def test_empty_results(self):
+        from handlers.knowledge_base.search import format_search_results
+        text = format_search_results([])
+        assert "未找到相关内容" in text
+
+    def test_single_result(self):
+        from handlers.knowledge_base.search import format_search_results, SearchResult
+        results = [SearchResult(
+            content="红烧肉做法",
+            metadata={"source": "recipe.pdf", "chunk_index": 0, "kb_name": "test"},
+            score=0.92,
+        )]
+        text = format_search_results(results)
+        assert "recipe.pdf" in text
+        assert "红烧肉做法" in text
+        assert "0.92" in text
+
+    def test_multiple_results_sorted(self):
+        from handlers.knowledge_base.search import format_search_results, SearchResult
+        results = [
+            SearchResult("内容A", {"source": "a.txt"}, 0.85),
+            SearchResult("内容B", {"source": "b.txt"}, 0.95),
+        ]
+        text = format_search_results(results)
+        # Results are formatted as-is (sorting is done upstream)
+        assert "内容A" in text
+        assert "内容B" in text
