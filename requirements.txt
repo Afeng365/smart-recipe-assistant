@@ -72,3 +72,9 @@ Werkzeug           ==3.1.8
 xlrd               ==2.0.2
 xxhash             ==3.7.0
 zstandard          ==0.25.0
+
+# RAG Knowledge Base
+chromadb           ==0.5.23
+sentence-transformers ==3.4.1
+pymupdf            ==1.25.5
+python-docx        ==1.1.2
