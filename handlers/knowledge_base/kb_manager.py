@@ -226,11 +226,11 @@ class KnowledgeBaseManager:
             # Update metadata DB
             db_mod.add_file_record(kb_name, filename, ext, file_size, len(chunks))
             db_mod.add_chunk_records(kb_name, filename, chunk_ids)
-            db_mod.update_kb_doc_count(kb_name)
 
             total_chunks += len(chunks)
             logger.info("Indexed %s: %d chunks", filename, len(chunks))
 
+        db_mod.update_kb_doc_count(kb_name)
         return total_chunks
 
     def remove_documents(self, kb_name: str, filenames: List[str]) -> None:
