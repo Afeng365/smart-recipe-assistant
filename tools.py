@@ -7,6 +7,7 @@ from handlers.memory_system import memory_mgr
 from handlers.tasks_system import TASKS
 from handlers.todomanager import TODO
 from settings.constant import WORKDIR
+from handlers.knowledge_base.search import search_knowledge_base, format_search_results
 
 # ── 工具定义 ──────────────────────────────────────────────────────────
 
@@ -232,6 +233,38 @@ def run_save_memory(name: str, description: str, mem_type: str, content: str) ->
     return memory_mgr.save_memory(name, description, mem_type, content)
 
 
+def search_recipe_knowledge_base(query: str, kb_name: str | None = None) -> dict:
+    """搜索本地菜谱知识库，查找用户上传的私人或本地菜谱内容。
+
+    当用户询问中餐、家常菜、或提到"我的菜谱""本地菜谱""家传"等关键词时优先使用。
+
+    Args:
+        query: 搜索查询，如"红烧肉做法"、"川菜麻婆豆腐"。
+        kb_name: 指定知识库名称（可选，不指定则搜索所有知识库）。
+
+    Returns:
+        {"results": [{"content": ..., "source": ..., "score": ...}], "total": N}
+    """
+    try:
+        results = search_knowledge_base(query, kb_name=kb_name)
+        return {
+            "results": [
+                {
+                    "content": r.content,
+                    "source": r.metadata.get("source", "未知"),
+                    "score": r.score,
+                }
+                for r in results
+            ],
+            "total": len(results),
+        }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("搜索知识库失败")
+        return {"error": str(e), "results": [], "total": 0}
+
+
 NATIVE_HANDLERS = {
     "bash": lambda **kw: run_bash(kw["command"]),
     "read_file": lambda **kw: run_read(kw["path"], kw.get("limit")),
@@ -256,6 +289,9 @@ NATIVE_HANDLERS = {
     "filter_cocktails_by_ingredient": filter_cocktails_by_ingredient,
     "get_cocktail_detail": get_cocktail_detail,
     "random_cocktail": random_cocktail,
+    "search_recipe_knowledge_base": lambda **kw: search_recipe_knowledge_base(
+        kw["query"], kw.get("kb_name")
+    ),
 }
 
 NATIVE_TOOLS = [
@@ -463,6 +499,24 @@ NATIVE_TOOLS = [
             "type": "object",
             "properties": {}
         }
-    }
+    },
+    {
+        "name": "search_recipe_knowledge_base",
+        "description": "搜索本地菜谱知识库，查找用户上传的私房菜谱、家传菜谱或本地导入的菜谱文档。当用户询问中餐、家常菜、或提到'我的菜谱''本地菜谱''家传'等关键词时优先使用。与TheMealDB的search_meals互补——中式/私人菜谱走知识库，西餐/鸡尾酒走TheMealDB。",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "搜索查询，如'红烧肉做法'、'川菜麻婆豆腐'"
+                },
+                "kb_name": {
+                    "type": "string",
+                    "description": "指定知识库名称，不指定则搜索所有知识库"
+                }
+            },
+            "required": ["query"]
+        }
+    },
 
 ]
