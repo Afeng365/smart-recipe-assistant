@@ -4,6 +4,7 @@ import json
 import shutil
 import sys
 import tempfile
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -553,3 +554,165 @@ class TestKnowledgeBaseManager:
         assert len(results_all) >= 1
 
         self.mgr.delete_kb("test_kb")
+
+
+class TestFlaskKBAPI:
+    """Tests for Flask KB management endpoints."""
+
+    @pytest.fixture
+    def client(self):
+        import sys as _sys
+        import handlers.knowledge_base.db as db_mod
+        from settings import constant
+        # Reset paths BEFORE any kb_manager method is called
+        self._orig_kb_root = constant.KB_ROOT_PATH
+        self._orig_kb_db = constant.KB_DB_PATH
+        self.tmpdir = Path(tempfile.mkdtemp())
+        constant.KB_ROOT_PATH = self.tmpdir
+        constant.KB_DB_PATH = self.tmpdir / "info.db"
+        db_mod.init_db(constant.KB_DB_PATH)  # Init with test path
+
+        # Mock embedding model to avoid HF download (tests need CRUD, not search)
+        import random as _random
+        _random.seed(42)
+        import handlers.knowledge_base.embedding as emb_mod
+        orig_new = emb_mod.EmbeddingModel.__new__
+        orig_load = emb_mod.EmbeddingModel.load
+        def _mock_new(cls, model_name="BAAI/bge-small-zh-v1.5"):
+            instance = super(emb_mod.EmbeddingModel, cls).__new__(cls)
+            instance._model_name = model_name
+            instance._loaded = True
+            instance._model = None
+            return instance
+        def _mock_load(self):
+            pass
+        emb_mod.EmbeddingModel.__new__ = _mock_new
+        emb_mod.EmbeddingModel.load = _mock_load
+        # Patch embed methods to return fixed-dim random vectors
+        _orig_embed = emb_mod.EmbeddingModel.embed
+        _orig_dim = emb_mod.EmbeddingModel.dimension.fget if isinstance(
+            emb_mod.EmbeddingModel.__dict__.get('dimension'), property
+        ) else None
+        def _mock_embed(self, texts):
+            if not texts:
+                return []
+            return [[_random.random() for _ in range(512)] for _ in range(len(texts))]
+        def _mock_dim(self):
+            return 512
+        emb_mod.EmbeddingModel.embed = _mock_embed
+        emb_mod.EmbeddingModel.dimension = property(_mock_dim)
+        emb_mod.EmbeddingModel.reset = lambda: None
+
+        # Replace kb_manager singleton with fresh instance for test isolation.
+        # NOTE: import ... as kb_mod resolves to the singleton (not the module)
+        # because __init__.py shadows the module name. Use sys.modules instead.
+        km_mod = _sys.modules["handlers.knowledge_base.kb_manager"]
+        from handlers.knowledge_base.kb_manager import KnowledgeBaseManager
+        # Override module-level constants so _ensure_init uses test paths
+        km_mod.KB_ROOT_PATH = self.tmpdir
+        km_mod.KB_DB_PATH = self.tmpdir / "info.db"
+        km_mod.kb_manager = KnowledgeBaseManager()
+        # Also update the package-level reference
+        import handlers.knowledge_base as kb_pkg
+        kb_pkg.kb_manager = km_mod.kb_manager
+
+        from app import app
+        app.config["TESTING"] = True
+        # Update app's kb_manager reference to use test singleton
+        import app as app_module
+        app_module.kb_manager = km_mod.kb_manager
+        with app.test_client() as client:
+            yield client
+
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        constant.KB_ROOT_PATH = self._orig_kb_root
+        constant.KB_DB_PATH = self._orig_kb_db
+        db_mod.db_path = self._orig_kb_db
+        if km_mod:
+            km_mod.KB_ROOT_PATH = self._orig_kb_root
+            km_mod.KB_DB_PATH = self._orig_kb_db
+
+    def test_create_kb(self, client):
+        resp = client.post("/api/kb/create",
+                          json={"name": "test_kb", "description": "测试"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["kb"]["name"] == "test_kb"
+
+    def test_create_duplicate_kb(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        resp = client.post("/api/kb/create", json={"name": "test_kb"})
+        assert resp.status_code == 409
+
+    def test_create_kb_invalid_name(self, client):
+        resp = client.post("/api/kb/create", json={"name": "bad/name"})
+        assert resp.status_code in (400, 409)
+
+    def test_list_kbs(self, client):
+        client.post("/api/kb/create", json={"name": "kb1"})
+        client.post("/api/kb/create", json={"name": "kb2"})
+        resp = client.get("/api/kb/list")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data["knowledge_bases"]) >= 2
+
+    def test_delete_kb(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        resp = client.delete("/api/kb/test_kb")
+        assert resp.status_code == 200
+        # Verify deleted
+        resp2 = client.get("/api/kb/list")
+        assert len(resp2.get_json()["knowledge_bases"]) == 0
+
+    def test_delete_nonexistent_kb(self, client):
+        resp = client.delete("/api/kb/nonexistent")
+        assert resp.status_code == 404
+
+    def test_upload_txt(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        data = {"files": (BytesIO("红烧肉做法测试".encode("utf-8")), "recipe.txt")}
+        resp = client.post("/api/kb/test_kb/upload",
+                          data=data, content_type="multipart/form-data")
+        assert resp.status_code == 200
+        result = resp.get_json()
+        assert result["chunk_count"] >= 1
+
+    def test_upload_unsupported_format(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        data = {"files": (BytesIO(b"\x00\x01\x02"), "data.bin")}
+        resp = client.post("/api/kb/test_kb/upload",
+                          data=data, content_type="multipart/form-data")
+        assert resp.status_code == 400
+
+    def test_upload_to_nonexistent_kb(self, client):
+        data = {"files": (BytesIO(b"test"), "recipe.txt")}
+        resp = client.post("/api/kb/nonexistent/upload",
+                          data=data, content_type="multipart/form-data")
+        assert resp.status_code == 404
+
+    def test_list_docs(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        client.post("/api/kb/test_kb/upload",
+                   data={"files": (BytesIO("测试内容".encode("utf-8")), "r.txt")},
+                   content_type="multipart/form-data")
+        resp = client.get("/api/kb/test_kb/docs")
+        assert resp.status_code == 200
+        docs = resp.get_json()["documents"]
+        assert len(docs) == 1
+        assert docs[0]["filename"] == "r.txt"
+
+    def test_list_docs_nonexistent_kb(self, client):
+        resp = client.get("/api/kb/nonexistent/docs")
+        assert resp.status_code == 404
+
+    def test_delete_docs(self, client):
+        client.post("/api/kb/create", json={"name": "test_kb"})
+        client.post("/api/kb/test_kb/upload",
+                   data={"files": (BytesIO("测试".encode("utf-8")), "r.txt")},
+                   content_type="multipart/form-data")
+        resp = client.delete("/api/kb/test_kb/docs",
+                            json={"filenames": ["r.txt"]})
+        assert resp.status_code == 200
+        # Verify deleted
+        resp2 = client.get("/api/kb/test_kb/docs")
+        assert len(resp2.get_json()["documents"]) == 0
