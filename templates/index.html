@@ -1141,10 +1141,18 @@ function renderKBCard(kb) {
 
 async function toggleKBCard(name) {
   const card = document.getElementById('kb-' + name);
+  if (!card) return;
   const expanded = card.classList.contains('expanded');
   if (expanded) { card.classList.remove('expanded'); return; }
+  await expandKBCard(name);
+}
+
+async function expandKBCard(name) {
+  const card = document.getElementById('kb-' + name);
+  if (!card) return;
   card.classList.add('expanded');
   const body = document.getElementById('kb-body-' + name);
+  if (!body) return;
   try {
     const data = await kbAPI('/' + encodeURIComponent(name) + '/docs');
     const docs = data.documents || [];
@@ -1243,7 +1251,8 @@ async function uploadFiles(kbName, files) {
       body: fd,
     });
     statusEl.innerHTML = `<div class="kb-toast success">✅ ${data.message}</div>`;
-    toggleKBCard(kbName);
+    await loadKBs();
+    expandKBCard(kbName);
   } catch (e) {
     statusEl.innerHTML = `<div class="kb-toast error">❌ ${escapeHtml(e.message)}</div>`;
   }
@@ -1257,8 +1266,8 @@ async function deleteDoc(kbName, filename) {
       body: JSON.stringify({ filenames: [filename] }),
     });
     kbToast(`文档「${filename}」已删除`, 'success');
-    toggleKBCard(kbName);
-    loadKBs();
+    await loadKBs();
+    expandKBCard(kbName);
   } catch (e) {
     kbToast(e.message, 'error');
   }
