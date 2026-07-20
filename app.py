@@ -99,9 +99,10 @@ def kb_create():
         info = kb_manager.create_kb(data["name"], data.get("description", ""))
         return jsonify({"status": "ok", "kb": info})
     except ValueError as e:
+        logging.exception(f"创建知识库失败: {str(e)}")
         return jsonify({"error": str(e)}), 409 if "已存在" in str(e) else 400
     except Exception as e:
-        logging.exception("创建知识库失败")
+        logging.exception(f"创建知识库失败: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
