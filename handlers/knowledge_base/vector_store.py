@@ -126,6 +126,25 @@ class VectorStore:
         """Return the number of chunks in the collection."""
         return self._collection.count()
 
+    def get_all_documents(self) -> List[Dict[str, Any]]:
+        """Retrieve all documents in the collection (for BM25 index building).
+
+        Returns:
+            List of dicts with keys: id (str), content (str), metadata (dict).
+        """
+        if self._collection.count() == 0:
+            return []
+        results = self._collection.get(include=["documents", "metadatas"])
+        docs = []
+        if results["ids"]:
+            for i in range(len(results["ids"])):
+                docs.append({
+                    "id": results["ids"][i],
+                    "content": results["documents"][i] if results["documents"] else "",
+                    "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                })
+        return docs
+
     def clear(self) -> None:
         """Delete the entire collection and re-create empty."""
         self.client.delete_collection(name=self.collection_name)

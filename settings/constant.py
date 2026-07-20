@@ -109,3 +109,9 @@ KB_MAX_FILE_SIZE_MB = 50
 KB_MAX_FILE_SIZE_BYTES = KB_MAX_FILE_SIZE_MB * 1024 * 1024
 KB_SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx", ".json")
 KB_VALID_NAME_PATTERN = r"^[一-龥a-zA-Z0-9_\-]+$"
+
+# 混合检索 + 重排序
+KB_USE_BM25 = True                     # 是否启用 BM25 混合检索
+KB_USE_RERANKER = True                 # 是否启用 Cross-Encoder 重排序
+KB_HYBRID_TOP_K_MULTIPLIER = 4         # 向量检索取 top_k * N 候选进入融合
+KB_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"

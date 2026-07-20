@@ -717,3 +717,121 @@ class TestFlaskKBAPI:
         # Verify deleted
         resp2 = client.get("/api/kb/test_kb/docs")
         assert len(resp2.get_json()["documents"]) == 0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# BM25 + Reranker + Hybrid Search tests
+# ══════════════════════════════════════════════════════════════════════
+
+class TestBM25:
+    """Tests for BM25 sparse retrieval."""
+
+    def test_tokenize(self):
+        from handlers.knowledge_base.bm25 import _tokenize
+        tokens = _tokenize("红烧肉的做法")
+        assert len(tokens) >= 2
+        assert "红烧肉" in tokens or "红烧" in tokens
+
+    def test_build_index(self):
+        from handlers.knowledge_base.bm25 import build_bm25_from_docs
+        docs = ["红烧肉是一道著名的家常菜", "麻婆豆腐是四川名菜"]
+        idx = build_bm25_from_docs(docs)
+        assert idx is not None
+
+    def test_build_empty_index(self):
+        from handlers.knowledge_base.bm25 import build_bm25_from_docs
+        assert build_bm25_from_docs([]) is None
+
+    def test_bm25_search(self):
+        from handlers.knowledge_base.bm25 import build_bm25_from_docs, bm25_search
+        docs = [
+            "红烧肉：五花肉焯水后加冰糖炒色",
+            "麻婆豆腐：豆腐加牛肉末和豆瓣酱",
+            "清蒸鱼：鱼加姜葱蒸10分钟",
+        ]
+        idx = build_bm25_from_docs(docs)
+        results = bm25_search(idx, "红烧肉做法", top_k=2)
+        assert len(results) >= 1
+        # First doc should be about 红烧肉
+        assert results[0][0] == 0
+
+    def test_bm25_empty_query(self):
+        from handlers.knowledge_base.bm25 import build_bm25_from_docs, bm25_search
+        docs = ["测试文档"]
+        idx = build_bm25_from_docs(docs)
+        results = bm25_search(idx, "", top_k=5)
+        assert results == []
+
+
+class TestReranker:
+    """Tests for Cross-Encoder reranker (falls back gracefully)."""
+
+    def test_singleton(self):
+        from handlers.knowledge_base.reranker import RerankerModel
+        RerankerModel.reset()
+        a = RerankerModel()
+        b = RerankerModel()
+        assert a is b
+
+    def test_rerank_fallback(self):
+        """Without HF access, reranker falls back to identity ranking."""
+        from handlers.knowledge_base.reranker import RerankerModel
+        RerankerModel.reset()
+        m = RerankerModel()
+        docs = ["doc one", "doc two", "doc three"]
+        results = m.rerank("test query", docs)
+        assert len(results) == len(docs)
+        indices = [r[0] for r in results]
+        assert indices == list(range(len(docs)))  # identity order preserved
+
+    def test_rerank_empty(self):
+        from handlers.knowledge_base.reranker import RerankerModel
+        RerankerModel.reset()
+        m = RerankerModel()
+        assert m.rerank("query", []) == []
+
+    def test_available_property(self):
+        from handlers.knowledge_base.reranker import RerankerModel
+        RerankerModel.reset()
+        m = RerankerModel()
+        # available property works (True if model loaded, False if not)
+        assert isinstance(m.available, bool)
+
+
+class TestRRFFusion:
+    """Tests for Reciprocal Rank Fusion logic."""
+
+    def test_rrf_fusion_combines_dense_and_sparse(self):
+        from handlers.knowledge_base.search import _rrf_fusion, SearchResult
+
+        dense = [
+            SearchResult(content="doc A", metadata={"kb_name": "kb1", "source": "a.txt", "chunk_index": 0}, score=0.9),
+            SearchResult(content="doc B", metadata={"kb_name": "kb1", "source": "a.txt", "chunk_index": 1}, score=0.5),
+        ]
+        sparse = [(2, 2.5)]  # index=2 → doc C
+        all_docs = [
+            {"content": "doc A", "metadata": {"kb_name": "kb1", "source": "a.txt", "chunk_index": 0}},
+            {"content": "doc B", "metadata": {"kb_name": "kb1", "source": "a.txt", "chunk_index": 1}},
+            {"content": "doc C", "metadata": {"kb_name": "kb1", "source": "b.txt", "chunk_index": 0}},
+        ]
+
+        result = _rrf_fusion(dense, sparse, all_docs)
+        assert len(result) >= 2  # doc A + doc B (from dense) + doc C (from sparse)
+        contents = {r.content for r in result}
+        assert "doc A" in contents
+        assert "doc C" in contents  # should be included from BM25
+
+    def test_rrf_sparse_brings_new_docs(self):
+        from handlers.knowledge_base.search import _rrf_fusion, SearchResult
+
+        dense = [
+            SearchResult(content="doc A", metadata={"kb_name": "kb1", "source": "a.txt", "chunk_index": 0}, score=0.9),
+        ]
+        sparse = [(1, 3.0)]  # doc B → not in dense
+        all_docs = [
+            {"content": "doc A", "metadata": {"kb_name": "kb1", "source": "a.txt", "chunk_index": 0}},
+            {"content": "doc B", "metadata": {"kb_name": "kb1", "source": "b.txt", "chunk_index": 0}},
+        ]
+
+        result = _rrf_fusion(dense, sparse, all_docs)
+        assert len(result) == 2  # both doc A and doc B
