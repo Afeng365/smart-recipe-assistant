@@ -58,6 +58,7 @@ class KnowledgeBaseManager:
 
         Raises:
             ValueError: If name is invalid or KB already exists.
+            RuntimeError: If vector store initialization fails (DB record rolled back).
         """
         _validate_kb_name(name)
         self._ensure_init()
@@ -69,16 +70,26 @@ class KnowledgeBaseManager:
         if existing:
             raise ValueError(f"知识库已存在: {name}")
 
-        # Create directories
+        # Create directories and DB record — rollback on any failure
         kb_dir = KB_ROOT_PATH / name
         content_dir = kb_dir / KB_CONTENT_DIR_NAME
         content_dir.mkdir(parents=True, exist_ok=True)
 
-        # Add to DB
         db_mod.add_kb_to_db(name, description, KB_DEFAULT_EMBEDDING_MODEL)
 
-        # Init ChromaDB collection
-        self._get_vector_store(name)
+        try:
+            # Init ChromaDB collection
+            self._get_vector_store(name)
+        except Exception:
+            # Rollback: remove DB record + filesystem directories
+            db_mod.remove_kb_from_db(name)
+            if kb_dir.exists():
+                import shutil
+                shutil.rmtree(kb_dir, ignore_errors=True)
+            logger.exception("Failed to init vector store for KB '%s', rolled back", name)
+            raise RuntimeError(
+                f"知识库「{name}」创建失败：向量存储初始化异常，已回滚。请检查 ChromaDB 是否正常。"
+            )
 
         logger.info("Created KB: %s", name)
         return db_mod.get_kb_from_db(name)
