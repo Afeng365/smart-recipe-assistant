@@ -27,7 +27,7 @@ def init_db(p: Path) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
             description TEXT DEFAULT '',
-            embedding_model TEXT DEFAULT 'BAAI/bge-small-zh-v1.5',
+            embedding_model TEXT DEFAULT 'qwen3-embedding:0.6b',
             doc_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -61,7 +61,7 @@ def init_db(p: Path) -> None:
 # -- KB CRUD ---------------------------------------------------------------
 
 def add_kb_to_db(name: str, description: str = "",
-                  embedding_model: str = "BAAI/bge-small-zh-v1.5") -> None:
+                  embedding_model: str = "qwen3-embedding:0.6b") -> None:
     conn = _connect()
     conn.execute(
         "INSERT INTO knowledge_base (name, description, embedding_model) VALUES (?, ?, ?)",

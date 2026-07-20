@@ -124,7 +124,7 @@ class TestEmbeddingModel:
     def test_singleton_different_model_names(self):
         from handlers.knowledge_base.embedding import EmbeddingModel
         EmbeddingModel.reset()
-        a = EmbeddingModel("BAAI/bge-small-zh-v1.5")
+        a = EmbeddingModel("qwen3-embedding:0.6b")
         b = EmbeddingModel("other-model")
         assert a is b  # singleton ignores second model_name
 
@@ -141,7 +141,7 @@ class TestEmbeddingModel:
         vectors = m.embed(["测试文本", "第二段文本"])
         assert len(vectors) == 2
         assert len(vectors[0]) == m.dimension
-        assert m.dimension == 512
+        assert m.dimension > 0  # auto-detected from API response
 
     def test_embed_empty_list(self):
         from handlers.knowledge_base.embedding import EmbeddingModel
@@ -154,7 +154,8 @@ class TestEmbeddingModel:
         EmbeddingModel.reset()
         m = EmbeddingModel()
         vec = m.embed_query("红烧肉怎么做")
-        assert len(vec) == 512
+        assert len(vec) == m.dimension
+        assert m.dimension > 0
 
 
 class TestChineseRecursiveTextSplitter:
@@ -311,7 +312,7 @@ class TestVectorStore:
     def test_add_and_count(self, store):
         import random
         random.seed(42)
-        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        embeddings = [[random.random() for _ in range(1024)] for _ in range(3)]
         store.add(
             texts=["文本一", "文本二", "文本三"],
             metadatas=[
@@ -327,7 +328,7 @@ class TestVectorStore:
     def test_query_returns_results(self, store):
         import random
         random.seed(42)
-        vec1 = [random.random() for _ in range(512)]
+        vec1 = [random.random() for _ in range(1024)]
         store.add(
             texts=["红烧肉的做法：五花肉焯水后炖煮"],
             metadatas=[{"source": "recipe.txt", "chunk_index": 0, "kb_name": "test_kb"}],
@@ -340,13 +341,13 @@ class TestVectorStore:
         assert results[0]["score"] > 0.9  # near-exact match
 
     def test_query_empty_store(self, store):
-        results = store.query([0.1] * 512, top_k=3)
+        results = store.query([0.1] * 1024, top_k=3)
         assert results == []
 
     def test_delete_by_ids(self, store):
         import random
         random.seed(42)
-        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        embeddings = [[random.random() for _ in range(1024)] for _ in range(3)]
         store.add(
             texts=["a", "b", "c"],
             metadatas=[{"source": "x.txt", "chunk_index": i, "kb_name": "test_kb"} for i in range(3)],
@@ -359,7 +360,7 @@ class TestVectorStore:
     def test_delete_by_filter(self, store):
         import random
         random.seed(42)
-        embeddings = [[random.random() for _ in range(512)] for _ in range(3)]
+        embeddings = [[random.random() for _ in range(1024)] for _ in range(3)]
         store.add(
             texts=["a", "b", "c"],
             metadatas=[
@@ -376,7 +377,7 @@ class TestVectorStore:
     def test_clear(self, store):
         import random
         random.seed(42)
-        embeddings = [[random.random() for _ in range(512)] for _ in range(2)]
+        embeddings = [[random.random() for _ in range(1024)] for _ in range(2)]
         store.add(
             texts=["a", "b"],
             metadatas=[{"source": "x.txt", "chunk_index": i, "kb_name": "test_kb"} for i in range(2)],
@@ -596,9 +597,9 @@ class TestFlaskKBAPI:
         def _mock_embed(self, texts):
             if not texts:
                 return []
-            return [[_random.random() for _ in range(512)] for _ in range(len(texts))]
+            return [[_random.random() for _ in range(1024)] for _ in range(len(texts))]
         def _mock_dim(self):
-            return 512
+            return 1024
         emb_mod.EmbeddingModel.embed = _mock_embed
         emb_mod.EmbeddingModel.dimension = property(_mock_dim)
         emb_mod.EmbeddingModel.reset = lambda: None
