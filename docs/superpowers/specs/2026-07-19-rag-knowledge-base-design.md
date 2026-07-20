@@ -1,8 +1,8 @@
 # RAG 知识库功能设计文档
 
-**日期**: 2026-07-19
+**日期**: 2026-07-19（更新于 2026-07-20）
 **项目**: smart-recipe-assistant（智能食谱助手）
-**状态**: 设计完成，待实现
+**状态**: 已实现
 
 ---
 
@@ -18,57 +18,68 @@
 
 ## 2. 技术选型
 
-| 维度 | 选择 | 理由 |
-|------|------|------|
-| 嵌入模型 | 本地 `BAAI/bge-small-zh-v1.5` | 512维轻量模型，中文效果好，离线免费 |
-| 向量存储 | ChromaDB（嵌入式模式） | Python 原生，支持元数据过滤，零运维 |
-| 元数据管理 | SQLite | 查询方便，适合管理文档映射关系 |
-| 工具集成 | 搜索为 LLM tool，管理走 Flask API | 搜索是对话核心功能，管理是后台操作 |
-| 文档加载 | PyMuPDF + python-docx + 原生 | 覆盖常见菜谱文档格式 |
-| 文本切片 | ChineseRecursiveTextSplitter | 中文感知切片，参考 Langchain-ChatChat |
+| 维度 | 设计计划 | 实际实现 | 理由 |
+|------|----------|----------|------|
+| 嵌入模型 | `BAAI/bge-small-zh-v1.5`（本地 sentence-transformers） | **`qwen3-embedding:0.6b`**（Ollama 本地部署） | HuggingFace 不可达，改用 Ollama REST API，1024 维向量自动检测 |
+| 向量存储 | ChromaDB（嵌入式模式） | ✅ ChromaDB 0.5.23 | Python 原生，支持元数据过滤，零运维 |
+| 元数据管理 | SQLite | ✅ SQLite | 查询方便，适合管理文档映射关系 |
+| 工具集成 | 搜索为 LLM tool，管理走 Flask API | ✅ 22 个 LLM tools 中包含 `search_recipe_knowledge_base` | 搜索是对话核心功能，管理是后台操作 |
+| 文档加载 | PyMuPDF + python-docx + 原生 | ✅ 5 种格式 | TXT/MD（原生）、PDF（PyMuPDF）、DOCX（python-docx）、JSON（自定义） |
+| 文本切片 | ChineseRecursiveTextSplitter | ✅ 13 级分隔符优先级 | 参考 Langchain-ChatChat 实现 |
+| BM25 混合检索 | 后续可扩展项 | ✅ **已实现** | jieba 中文分词 + rank_bm25 + RRF 融合 |
+| Cross-Encoder 重排序 | 后续可扩展项 | ✅ **已实现** | ms-marco-MiniLM-L-6-v2，优雅降级 |
+| 前端管理界面 | 后续可扩展项 | ✅ **已实现** | 双栏布局侧边栏，拖拽上传，创建/删除/文档管理 |
 
 ---
 
 ## 3. 整体架构
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                    Flask Web UI                        │
-│  GET /                    → SPA 前端                  │
-│  GET /api/chat/stream     → SSE 对话流（已有）        │
-│  POST /api/kb/create      → 创建知识库    [新增]      │
-│  POST /api/kb/upload      → 上传文档      [新增]      │
-│  GET /api/kb/list         → 列出知识库    [新增]      │
-│  DELETE /api/kb/<name>    → 删除知识库    [新增]      │
-│  GET /api/kb/<name>/docs  → 列出文档      [新增]      │
-│  DELETE /api/kb/docs      → 删除文档      [新增]      │
-└──────────────────────────┬───────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    Flask Web UI                            │
+│  GET /                    → SPA 前端（双栏布局）           │
+│  GET /api/chat/stream     → SSE 对话流（已有）            │
+│  POST /api/kb/create      → 创建知识库                    │
+│  GET /api/kb/list         → 列出知识库                    │
+│  DELETE /api/kb/<name>    → 删除知识库                    │
+│  POST /api/kb/<name>/upload → 上传文档（拖拽/多文件）     │
+│  GET /api/kb/<name>/docs  → 列出文档                      │
+│  DELETE /api/kb/<name>/docs → 删除文档                    │
+│  GET /api/health          → 健康检查                      │
+└──────────────────────────┬───────────────────────────────┘
                            │
-┌──────────────────────────▼───────────────────────────┐
-│              RecipeAgent (recipe_agent.py)             │
-│  + search_recipe_knowledge_base(query, kb_name) [新工具]│
-│    → 搜索知识库，返回相关文档片段                       │
-└──────────────────────────┬───────────────────────────┘
+┌──────────────────────────▼───────────────────────────────┐
+│              RecipeAgent (recipe_agent.py)                 │
+│  + search_recipe_knowledge_base(query, kb_name) [新工具]  │
+│    → 搜索知识库，返回相关文档片段                          │
+│    → 混合检索流水线：Dense + BM25 → RRF → CrossEncoder    │
+└──────────────────────────┬───────────────────────────────┘
                            │
-┌──────────────────────────▼───────────────────────────┐
-│         KnowledgeBase 子系统 (handlers/knowledge_base/)│
-│  ├── __init__.py           → 模块入口                 │
-│  ├── kb_manager.py         → KB CRUD 核心             │
-│  ├── document_loader.py    → 文档加载/切片            │
-│  ├── embedding.py          → 嵌入模型（单例）          │
-│  ├── vector_store.py       → ChromaDB 操作封装         │
-│  ├── search.py             → 检索逻辑                 │
-│  └── db.py                 → SQLite 元数据库           │
-└──────────────────────────┬───────────────────────────┘
+┌──────────────────────────▼───────────────────────────────┐
+│         KnowledgeBase 子系统 (handlers/knowledge_base/)   │
+│  ├── __init__.py           → 模块入口                     │
+│  ├── kb_manager.py         → KB CRUD 核心（事务性创建）   │
+│  ├── document_loader.py    → 文档加载 + ChineseRecursiveTextSplitter │
+│  ├── embedding.py          → Ollama 嵌入模型（单例）       │
+│  ├── vector_store.py       → ChromaDB 操作封装            │
+│  ├── search.py             → 混合检索 + RRF 融合 + 重排序 │
+│  ├── bm25.py               → BM25 稀疏检索（jieba）       │
+│  ├── reranker.py           → Cross-Encoder 重排序（单例）  │
+│  └── db.py                 → SQLite 元数据库（3 表）       │
+└──────────────────────────┬───────────────────────────────┘
                            │
-┌──────────────────────────▼───────────────────────────┐
-│                    存储层                              │
-│  data/knowledge_base/                                 │
-│  ├── info.db            → SQLite 元数据库              │
-│  └── <kb_name>/                                      │
-│      ├── content/       → 原始文档                    │
-│      └── chroma/        → ChromaDB 持久化向量数据      │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────▼───────────────────────────────┐
+│                    存储层                                  │
+│  data/knowledge_base/                                     │
+│  ├── info.db            → SQLite 元数据库                  │
+│  └── <kb_name>/                                          │
+│      ├── content/       → 原始文档                        │
+│      └── chroma/        → ChromaDB 持久化向量数据          │
+│                                                           │
+│  Ollama Server (localhost:11434)                          │
+│  ├── qwen3-embedding:0.6b   → 嵌入模型（1024 维）         │
+│  └── API: /api/embed, /api/tags                           │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -77,125 +88,78 @@
 
 ### 4.1 KnowledgeBaseManager（`kb_manager.py`）
 
-知识库生命周期管理，对外提供统一入口：
-
 ```python
 class KnowledgeBaseManager:
-    def create_kb(name: str, description: str = "") -> KBInfo
-    def delete_kb(name: str) -> None
-    def list_kbs() -> List[KBInfo]
-    def get_kb(name: str) -> KBInfo
+    def create_kb(name, description) -> KBInfo   # 事务性创建，向量库失败则回滚
+    def delete_kb(name) -> None                   # 清理向量库 + DB + 文件
+    def list_kbs() -> list[KBInfo]
+    def get_kb(name) -> KBInfo | None
 
-    def add_documents(kb_name: str, files: List[UploadFile],
-                      chunk_size: int = 500,
-                      chunk_overlap: int = 50) -> int  # 返回切片总数
-    def remove_documents(kb_name: str, filenames: List[str]) -> None
-    def list_documents(kb_name: str) -> List[DocInfo]
+    def add_documents(kb_name, files, chunk_size=500, chunk_overlap=50) -> int
+    def remove_documents(kb_name, filenames) -> None
+    def list_documents(kb_name) -> list[DocInfo]
 ```
 
-**设计要点**：
-- 知识库名称做安全校验（防路径遍历），规则：只允许中文、字母、数字、下划线、短横线
-- `add_documents` 内部调用文档加载 → 切片 → 嵌入 → 写入 ChromaDB → 更新 SQLite 的完整流水线
-- 删除知识库时同步清理文件、ChromaDB 数据、SQLite 记录
+- 名称校验：regex `^[一-龥a-zA-Z0-9_\-]+$`
+- 失败回滚：`create_kb` 中 ChromaDB 初始化异常时自动删除 DB 记录 + 文件目录
+- 重复文件：再次上传自动替换旧切片
 
 ### 4.2 文档处理流水线（`document_loader.py`）
 
 ```
-文件上传 → 格式检测 → 文本提取 → 中文智能切片 → 嵌入向量 → ChromaDB
+文件上传 → 格式检测 → 文本提取 → ChineseRecursiveTextSplitter → 嵌入 → ChromaDB
 ```
 
-**支持的格式与加载器**：
+**支持的格式**：
 
 | 格式 | 加载器 | 依赖 |
 |------|--------|------|
 | .txt | 原生 `open()` | 无 |
 | .md | 原生 `open()` | 无 |
 | .pdf | PyMuPDF (fitz) | `pymupdf` |
-| .docx | python-docx | `python-docx` |
-| .json | 自定义（支持列表/字典格式） | 无 |
+| .docx | python-docx（含表格文本） | `python-docx` |
+| .json | 自定义（列表/字典/嵌套结构） | 无 |
 
-**文本切片**：参考 Langchain-ChatChat 的 `ChineseRecursiveTextSplitter`：
-- 分隔符优先级：`"\n\n"` → `"\n"` → `"。"` → `"！"` → `"？"` → `"."` → `"!"` → `"?"` → `"；"` → `";"` → `"，"` → `","` → `" "`
+**ChineseRecursiveTextSplitter**：
+- 分隔符优先级：`"\n\n"` → `"\n"` → `"。！？"` → `".!?"` → `"；;"` → `"，,"` → `" "`
 - 默认参数：`chunk_size=500`, `chunk_overlap=50`
-- 理由：菜谱文档通常一道菜几百字，500 字切片能完整包含一道菜的信息
 
 ### 4.3 嵌入模型（`embedding.py`）
 
-```python
-class EmbeddingModel:
-    """嵌入模型封装，单例模式，避免重复加载"""
-    _instance = None
-    _model = None
-
-    def __new__(cls, model_name: str = "BAAI/bge-small-zh-v1.5"):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def load(self) -> None        # 首次使用时下载并加载模型
-    def embed(self, texts: List[str]) -> List[List[float]]   # 批量嵌入
-    def embed_query(self, text: str) -> List[float]           # 单条嵌入
-    @property
-    def dimension(self) -> int    # 512
-```
-
-**设计要点**：
-- 使用 `sentence-transformers` 库，自动处理 tokenization 和 pooling
-- 默认模型 `BAAI/bge-small-zh-v1.5`（约 100MB，512 维向量）
-- BGE 模型对查询和文档建议不同处理（`embed_query` 可加 instruction prefix）
-- 预留 `model_name` 参数支持切换到更大模型（如 `bge-base-zh-v1.5`、`bge-large-zh-v1.5`）
+- 模型：**`qwen3-embedding:0.6b`**（Ollama 本地部署）
+- 维度：**1024**（运行时自动检测，首次请求后缓存）
+- 接口：Ollama REST API — `POST /api/embed`，60s 超时
+- 单例模式，惰性加载（首次调用时验证 Ollama 连通性）
 
 ### 4.4 向量存储（`vector_store.py`）
 
+- ChromaDB PersistentClient（按 persist_dir 缓存）
+- 每个 KB 一个 Collection：`kb_{kb_name}`
+- 余弦距离（`hnsw:space: cosine`）
+- `get_all_documents()` 支持 BM25 索引构建
+
+### 4.5 搜索流水线（`search.py` → `bm25.py` → `reranker.py`）
+
+```
+用户查询
+    │
+    ├──→ 向量检索 (dense)    → 取 top_k × 4 候选
+    ├──→ BM25 检索 (sparse)  → jieba 分词 + rank_bm25 [可选，KB_USE_BM25=True]
+    │
+    ├──→ RRF 融合 (k=60)     → 合并去重 [可选]
+    │
+    ├──→ Cross-Encoder 重排  → ms-marco-MiniLM-L-6-v2 精排 [可选，KB_USE_RERANKER=True]
+    │
+    └──→ 返回 top_k 结果 → format_search_results()
+```
+
+切换开关（`settings/constant.py`）：
+
 ```python
-class VectorStore:
-    """ChromaDB 操作封装"""
-    def __init__(self, kb_name: str, embedding_model: EmbeddingModel)
-    def add(self, texts: List[str], metadatas: List[dict], ids: List[str]) -> None
-    def query(self, query_text: str, top_k: int = 3,
-              score_threshold: float = 0.3) -> List[SearchResult]
-    def delete(self, ids: List[str]) -> None
-    def delete_by_filter(self, filter: dict) -> None   # 按元数据删除
-    def count(self) -> int
-    def clear(self) -> None
-```
-
-**设计要点**：
-- 每个知识库对应一个 ChromaDB Collection，名称为 `kb_{kb_name}`
-- 持久化路径：`data/knowledge_base/{kb_name}/chroma/`
-- 元数据字段：`source`（文件名）、`chunk_index`（切片序号）、`kb_name`
-- `score_threshold` 默认 0.3（ChromaDB 默认 cosine 距离，1.0=完全匹配，0=无关）
-
-### 4.5 检索逻辑（`search.py`）
-
-```python
-@dataclass
-class SearchResult:
-    content: str
-    metadata: dict
-    score: float
-
-def search_knowledge_base(query: str, kb_name: str = None,
-                          top_k: int = 3,
-                          score_threshold: float = 0.3) -> List[SearchResult]:
-    """
-    搜索知识库。
-    kb_name 为 None 时搜索所有知识库，合并结果去重排序。
-    """
-
-def format_search_results(results: List[SearchResult]) -> str:
-    """将搜索结果格式化为 LLM 可读的上下文字符串"""
-```
-
-**检索结果格式化模板**：
-
-```
-【已知菜谱知识】
-[来源：家庭菜谱.pdf，相关性：0.92]
-五花肉500g，冰糖30g，老抽15ml...
-
-[来源：川菜大全.pdf，相关性：0.85]
-四川红烧肉讲究先炒糖色...
+KB_USE_BM25 = True
+KB_USE_RERANKER = True
+KB_HYBRID_TOP_K_MULTIPLIER = 4
+KB_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 ```
 
 ### 4.6 SQLite 元数据库（`db.py`）
@@ -203,214 +167,109 @@ def format_search_results(results: List[SearchResult]) -> str:
 三张表：
 
 ```sql
-CREATE TABLE IF NOT EXISTS knowledge_base (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    description TEXT DEFAULT '',
-    embedding_model TEXT DEFAULT 'BAAI/bge-small-zh-v1.5',
-    doc_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS knowledge_file (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kb_name TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    file_ext TEXT,
-    file_size INTEGER,
-    chunk_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(kb_name, filename),
-    FOREIGN KEY (kb_name) REFERENCES knowledge_base(name) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS file_chunk (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kb_name TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    chunk_index INTEGER NOT NULL,
-    chunk_id TEXT NOT NULL,   -- ChromaDB 内部的 chunk ID
-    FOREIGN KEY (kb_name) REFERENCES knowledge_base(name) ON DELETE CASCADE,
-    FOREIGN KEY (kb_name, filename) REFERENCES knowledge_file(kb_name, filename) ON DELETE CASCADE
-);
+knowledge_base  (id, name UNIQUE, description, embedding_model, doc_count, created_at)
+knowledge_file  (id, kb_name FK, filename, file_ext, file_size, chunk_count, created_at)
+file_chunk      (id, kb_name FK, filename FK, chunk_index, chunk_id)
 ```
-
-**设计要点**：
-- SQLite 文件路径：`data/knowledge_base/info.db`
-- name 使用外键约束保证数据一致性
-- `file_chunk` 表记录了文件名到 ChromaDB chunk ID 的映射，用于精确删除
 
 ---
 
 ## 5. LLM 工具集成
 
-### 5.1 新增 Tool 定义
-
-在 `tools.py` 中新增：
+搜索工具（`tools.py`）：
 
 ```python
-def search_recipe_knowledge_base(query: str, kb_name: str = None) -> dict:
-    """
-    搜索本地菜谱知识库，查找用户上传的私人或本地菜谱内容。
-    优先用于查找中餐、家常菜、或用户提到"我的菜谱"、"本地菜谱"时。
-    参数:
-      query: 搜索查询，如"红烧肉做法"、"川菜麻婆豆腐"
-      kb_name: 指定知识库名称（可选，不指定则搜索所有知识库）
-    返回:
-      {"results": [{"content": ..., "source": ..., "score": ...}], "total": N}
-    """
+NATIVE_HANDLERS["search_recipe_knowledge_base"] = search_recipe_knowledge_base
 ```
 
-工具定义（OpenAI Function Calling 格式）：
+工具定义包含中文描述，引导 LLM 在中文/家常菜场景下优先使用知识库。
 
-```python
-{
-    "type": "function",
-    "function": {
-        "name": "search_recipe_knowledge_base",
-        "description": "搜索本地菜谱知识库，查找用户上传的私房菜谱、家传菜谱或本地导入的菜谱文档。当用户询问中餐、家常菜、或提到'我的菜谱''本地菜谱''家传'等关键词时优先使用。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "搜索查询，如'红烧肉做法'、'川菜麻婆豆腐'"
-                },
-                "kb_name": {
-                    "type": "string",
-                    "description": "指定知识库名称，不指定则搜索所有知识库"
-                }
-            },
-            "required": ["query"]
-        }
-    }
-}
-```
-
-### 5.2 与现有工具的关系
-
-| 工具 | 适用场景 | 数据来源 |
-|------|----------|----------|
-| `search_meals` | 西餐、国际菜谱、鸡尾酒 | TheMealDB / TheCocktailDB |
-| `search_recipe_knowledge_base` | 中餐、家常菜、私人菜谱 | 本地知识库 |
-
-LLM 被指示根据用户查询语言和内容自动选择合适的工具，或两者都调用进行交叉参考。
+与 TheMealDB 工具互补：中式/私人菜谱 → 知识库，西餐/鸡尾酒 → 外部 API。
 
 ---
 
 ## 6. Flask API 端点
 
-| 方法 | 路径 | 描述 | 请求体 |
-|------|------|------|--------|
-| POST | `/api/kb/create` | 创建知识库 | `{"name": "...", "description": "..."}` |
-| GET | `/api/kb/list` | 列出所有知识库 | - |
-| DELETE | `/api/kb/<name>` | 删除知识库 | - |
-| POST | `/api/kb/<name>/upload` | 上传文档 | `multipart/form-data`, `files` 字段 |
-| GET | `/api/kb/<name>/docs` | 列出文档 | - |
-| DELETE | `/api/kb/<name>/docs` | 删除文档 | `{"filenames": ["a.pdf", "b.txt"]}` |
-| GET | `/api/health` | 健康检查（已有） | - |
-
-**设计要点**：
-- 文件上传使用 `multipart/form-data`，支持批量上传（`<input multiple>`）
-- 上传后自动触发文档处理流水线（加载→切片→嵌入→存储）
-- 返回处理结果（切片数量、耗时）
-- 错误处理：文件格式不支持、文件过大（>50MB）、知识库不存在等
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| POST | `/api/kb/create` | 创建知识库 |
+| GET | `/api/kb/list` | 列出知识库 |
+| DELETE | `/api/kb/<name>` | 删除知识库 |
+| POST | `/api/kb/<name>/upload` | 上传文档（multipart/form-data） |
+| GET | `/api/kb/<name>/docs` | 列出文档 |
+| DELETE | `/api/kb/<name>/docs` | 删除文档 |
+| GET | `/api/health` | 健康检查（已有） |
 
 ---
 
-## 7. 依赖变更
+## 7. 前端管理界面
 
-`requirements.txt` 新增：
-
-```
-chromadb==0.5.23          # ChromaDB 向量数据库
-sentence-transformers==3.4.1  # 嵌入模型
-pymupdf==1.25.5           # PDF 解析
-python-docx==1.1.2        # DOCX 解析
-```
-
-首次使用时自动下载嵌入模型（约 100MB），后续从缓存加载。
+双栏布局 SPA 页面：
+- **左侧**：对话区 + 输入框
+- **右侧**：知识库管理侧边栏（380px，<900px 时移到底部）
+  - 创建知识库（名称 + 描述 + 按钮）
+  - 知识库卡片（可展开，显示文档列表 + 上传区）
+  - 拖拽上传（支持 TXT/MD/PDF/DOCX/JSON，最大 50MB）
+  - 文档删除 + Toast 消息提示
+  - 页面加载时自动显示
 
 ---
 
-## 8. 目录结构变更
+## 8. 依赖
 
 ```
-smart-recipe-assistant/
-  handlers/
-    knowledge_base/          # [新增] RAG 知识库子系统
-      __init__.py
-      kb_manager.py          # KB CRUD 管理
-      document_loader.py     # 文档加载 + 中文切片
-      embedding.py           # 嵌入模型封装
-      vector_store.py        # ChromaDB 操作
-      search.py              # 检索逻辑
-      db.py                  # SQLite 元数据库
-  tools.py                   # [修改] 新增 search_recipe_knowledge_base
-  app.py                     # [修改] 新增 /api/kb/* 路由
-  settings/
-    constant.py              # [修改] 新增 KB 相关配置常量
-  data/
-    knowledge_base/          # [新增] 知识库存储根目录
-      info.db                # SQLite 元数据库（运行时创建）
-  docs/superpowers/specs/
-    2026-07-19-rag-knowledge-base-design.md  # 本文档
+chromadb==0.5.23
+jieba==0.42.1
+rank-bm25==0.2.2
+sentence-transformers==3.4.1   # Cross-Encoder reranker
+pymupdf==1.25.5
+python-docx==1.1.2
 ```
 
 ---
 
-## 9. 错误处理
+## 9. 环境要求
 
-| 错误场景 | 处理方式 |
-|----------|----------|
-| 知识库名称非法（含路径分隔符等） | 400 Bad Request + 错误消息 |
-| 创建同名知识库 | 409 Conflict |
-| 知识库不存在 | 404 Not Found |
-| 文件格式不支持 | 400 Bad Request，列出支持的格式 |
-| 文件过大（>50MB） | 413 Payload Too Large |
-| 嵌入模型加载失败 | 500，记录日志，提示检查网络/磁盘 |
-| ChromaDB 读写失败 | 500，记录日志，保留原始文档不丢失 |
-| 知识库为空时搜索 | 返回空结果，LLM 告知用户"知识库中暂无相关内容" |
+| 组件 | 说明 |
+|------|------|
+| Ollama | 本地运行，需拉取 `qwen3-embedding:0.6b`：`ollama pull qwen3-embedding:0.6b` |
+| Cross-Encoder（可选） | HF 网络可达时自动加载 `cross-encoder/ms-marco-MiniLM-L-6-v2`，不可达时优雅降级 |
 
 ---
 
 ## 10. 配置常量
 
-在 `settings/constant.py` 中新增：
-
 ```python
-# 知识库配置
-KB_ROOT_PATH = WORKDIR / "data" / "knowledge_base"
-KB_DB_PATH = KB_ROOT_PATH / "info.db"
-KB_CONTENT_DIR_NAME = "content"
-KB_CHROMA_DIR_NAME = "chroma"
-KB_DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
+KB_ROOT_PATH = "data/knowledge_base/"
+KB_DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:0.6b"
+KB_EMBEDDING_DIMENSION = 1024  # 运行时自动检测
+KB_OLLAMA_BASE_URL = "http://localhost:11434"
 KB_DEFAULT_CHUNK_SIZE = 500
 KB_DEFAULT_CHUNK_OVERLAP = 50
 KB_DEFAULT_TOP_K = 3
 KB_DEFAULT_SCORE_THRESHOLD = 0.3
 KB_MAX_FILE_SIZE_MB = 50
-KB_SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx", ".json")
+KB_USE_BM25 = True
+KB_USE_RERANKER = True
+KB_HYBRID_TOP_K_MULTIPLIER = 4
+KB_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 ```
 
 ---
 
-## 11. 测试策略
+## 11. 测试覆盖
 
-| 测试类型 | 覆盖内容 |
-|----------|----------|
-| 单元测试 | `document_loader` 各格式加载器、`ChineseRecursiveTextSplitter` 切片逻辑、`db.py` CRUD 操作 |
-| 集成测试 | 完整流水线：创建 KB → 上传文档 → 搜索 → 删除 KB |
-| 边界测试 | 空文件、超大文件、异常格式、特殊字符文件名、并发上传 |
-| E2E 测试 | Flask API 端点请求/响应验证，LLM tool 调用链路验证 |
-
----
-
-## 12. 后续可扩展项（不在本次范围）
-
-- **BM25 混合检索**：提升关键词匹配精度
-- **Reranker 重排序**：用 Cross-Encoder 对初步检索结果精排
-- **知识库更新/重索引**：修改文档后重新切片嵌入
-- **临时知识库**：上传文件仅用于当前对话，不持久化（参考 Langchain-ChatChat 的 `memo_faiss_pool`）
-- **多嵌入模型支持**：生产环境可切换 `bge-large-zh-v1.5`
-- **前端管理界面**：在 SPA 中增加知识库管理面板
+| 测试类 | 数量 | 覆盖内容 |
+|--------|------|----------|
+| TestDB | 9 | SQLite CRUD 全操作 |
+| TestEmbeddingModel | 5 | 单例、惰性加载、批量嵌入、查询嵌入、空列表（需 Ollama 运行） |
+| TestChineseRecursiveTextSplitter | 8 | 中英文分隔符、重叠、硬分割、菜谱文本 |
+| TestDocumentLoader | 6 | TXT/MD/JSON 加载、格式拒绝、文件缺失 |
+| TestVectorStore | 6 | 增/查/删/过滤/清空 |
+| TestFormatSearchResults | 3 | 空结果、单结果、多结果 |
+| TestKnowledgeBaseManager | 10 | KB 全生命周期 + 文档增删 + 端到端工作流 |
+| TestFlaskKBAPI | 12 | 6 个端点 × 正常/异常场景 |
+| TestBM25 | 5 | 分词、索引构建、空索引、搜索、空查询 |
+| TestReranker | 4 | 单例、降级、空列表、available 属性 |
+| TestRRFFusion | 2 | 稠密+稀疏融合、BM25 贡献新结果 |
+| **合计** | **70** | 全链路覆盖 |
