@@ -1,7 +1,14 @@
 """ChromaDB vector store wrapper -- one collection per knowledge base."""
 import logging
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+
+# ── 禁用 ChromaDB 遥测 ──────────────────────────────────────────────
+# posthog 版本与 chromadb 0.5.23 不兼容，import 时即触发报错
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+# 抑制 ChromaDB 遥测模块的 ERROR 日志（不影响功能）
+logging.getLogger("chromadb.telemetry").setLevel(logging.CRITICAL)
 
 logger = logging.getLogger(__name__)
 

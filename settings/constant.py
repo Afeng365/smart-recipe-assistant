@@ -1,5 +1,10 @@
+import logging
 import os
 from pathlib import Path
+
+# 禁用 ChromaDB 遥测（避免 posthog 版本与 chromadb 0.5.23 不兼容）
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+logging.getLogger("chromadb.telemetry").setLevel(logging.CRITICAL)
 
 WORKDIR = Path.cwd()
 MODEL = os.environ["MODEL_ID"]
