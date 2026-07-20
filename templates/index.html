@@ -381,6 +381,246 @@
   .btn-send:active { transform: scale(0.95); }
   .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+  /* ── KB Toggle Button ── */
+  .btn-kb-toggle {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    margin-left: auto;
+    margin-right: 12px;
+  }
+  .btn-kb-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(6, 182, 212, 0.08);
+  }
+
+  /* ── KB Panel Overlay ── */
+  .kb-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .kb-overlay.open {
+    opacity: 1; pointer-events: auto;
+  }
+
+  /* ── KB Panel ── */
+  .kb-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 420px; max-width: 90vw;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    z-index: 101;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -8px 0 40px rgba(0,0,0,0.6);
+  }
+  .kb-panel.open { transform: translateX(0); }
+
+  .kb-panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  .kb-panel-header h2 {
+    font-size: 16px; font-weight: 600;
+    flex: 1;
+  }
+  .btn-kb-close {
+    width: 32px; height: 32px;
+    border: none; border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-kb-close:hover { color: var(--text-primary); background: var(--bg-input); }
+
+  .kb-panel-body {
+    flex: 1; overflow-y: auto;
+    padding: 16px 20px;
+    display: flex; flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ── KB Section ── */
+  .kb-section-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: -4px;
+  }
+
+  /* ── KB Create Form ── */
+  .kb-create-form {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .kb-create-form input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 13px; padding: 8px 12px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .kb-create-form input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .kb-create-form input::placeholder { color: var(--text-muted); }
+
+  .btn {
+    border: none; border-radius: var(--radius-sm);
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    padding: 8px 16px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-green));
+    color: #fff;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-sm {
+    font-size: 11px; padding: 4px 10px;
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .btn-outline:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── KB Card ── */
+  .kb-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .kb-card:hover { border-color: rgba(6, 182, 212, 0.3); }
+  .kb-card-header {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+  .kb-card-header:hover { background: rgba(255,255,255,0.02); }
+  .kb-card-icon {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: 8px;
+    background: rgba(6, 182, 212, 0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .kb-card-info { flex: 1; min-width: 0; }
+  .kb-card-name {
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .kb-card-meta {
+    font-size: 11px; color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .kb-card-actions {
+    display: flex; gap: 6px; flex-shrink: 0;
+  }
+  .kb-card-expand {
+    font-size: 12px; color: var(--text-muted);
+    transition: transform 0.2s;
+  }
+  .kb-card.expanded .kb-card-expand { transform: rotate(180deg); }
+
+  .kb-card-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    flex-direction: column; gap: 12px;
+  }
+  .kb-card.expanded .kb-card-body { display: flex; }
+
+  /* ── KB Upload Zone ── */
+  .kb-upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .kb-upload-zone:hover, .kb-upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(6, 182, 212, 0.05);
+    color: var(--accent);
+  }
+  .kb-upload-zone .upload-icon { font-size: 28px; margin-bottom: 6px; }
+  .kb-upload-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── KB Doc List ── */
+  .kb-doc-list { display: flex; flex-direction: column; gap: 4px; }
+  .kb-doc-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    font-size: 12px;
+  }
+  .kb-doc-item .doc-icon { font-size: 14px; flex-shrink: 0; }
+  .kb-doc-item .doc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+  .kb-doc-item .doc-size { color: var(--text-muted); white-space: nowrap; }
+  .kb-doc-item .doc-chunks { color: var(--text-muted); white-space: nowrap; font-size: 11px; }
+
+  /* ── KB Messages ── */
+  .kb-toast {
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    font-size: 13px; animation: msg-in 0.3s ease-out;
+  }
+  .kb-toast.success {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: var(--accent-green);
+  }
+  .kb-toast.error {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+  }
+  .kb-empty {
+    text-align: center; padding: 24px 0;
+    color: var(--text-muted); font-size: 13px;
+  }
+
   @media (max-width: 640px) {
     .header { padding: 12px 16px; }
     .header h1 { font-size: 16px; }
@@ -402,6 +642,32 @@
   <div class="status">
     <span class="status-dot"></span>
     <span>在线</span>
+  </div>
+  <button class="btn-kb-toggle" id="btnKbToggle" title="知识库管理" onclick="toggleKBPanel()">📚</button>
+</div>
+
+<!-- KB Panel Overlay -->
+<div class="kb-overlay" id="kbOverlay" onclick="toggleKBPanel()"></div>
+
+<!-- KB Management Panel -->
+<div class="kb-panel" id="kbPanel">
+  <div class="kb-panel-header">
+    <span style="font-size:20px;">📚</span>
+    <h2>知识库管理</h2>
+    <button class="btn-kb-close" onclick="toggleKBPanel()">✕</button>
+  </div>
+  <div class="kb-panel-body" id="kbPanelBody">
+    <!-- Create Form -->
+    <div class="kb-section-title">创建知识库</div>
+    <div class="kb-create-form" id="kbCreateForm">
+      <input type="text" id="kbNameInput" placeholder="知识库名称（如：川菜大全）" maxlength="40">
+      <input type="text" id="kbDescInput" placeholder="描述（可选）" maxlength="120">
+      <button class="btn btn-primary btn-sm" onclick="createKB()" id="btnCreateKb">+ 创建知识库</button>
+    </div>
+    <div id="kbToast"></div>
+    <!-- KB List -->
+    <div class="kb-section-title">我的知识库</div>
+    <div id="kbList"><div class="kb-empty">加载中...</div></div>
   </div>
 </div>
 
@@ -823,6 +1089,201 @@ function scrollToBottom() {
 // ── Input watcher ──
 document.getElementById('inputBox').addEventListener('input', function() {
   document.getElementById('sendBtn').disabled = !this.value.trim() || isLoading;
+});
+
+// ── KB Panel Toggle ──
+let kbPanelOpen = false;
+function toggleKBPanel() {
+  kbPanelOpen = !kbPanelOpen;
+  document.getElementById('kbPanel').classList.toggle('open', kbPanelOpen);
+  document.getElementById('kbOverlay').classList.toggle('open', kbPanelOpen);
+  if (kbPanelOpen) loadKBs();
+}
+
+// ── KB API helpers ──
+async function kbAPI(path, opts = {}) {
+  const res = await fetch('/api/kb' + path, {
+    headers: opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || '请求失败');
+  return data;
+}
+
+function kbToast(msg, type) {
+  const el = document.getElementById('kbToast');
+  el.innerHTML = `<div class="kb-toast ${type}">${escapeHtml(msg)}</div>`;
+  setTimeout(() => { if (el.querySelector('.kb-toast')) el.innerHTML = ''; }, 4000);
+}
+
+// ── KB CRUD ──
+async function loadKBs() {
+  const list = document.getElementById('kbList');
+  try {
+    const data = await kbAPI('/list');
+    const kbs = data.knowledge_bases || [];
+    if (kbs.length === 0) {
+      list.innerHTML = '<div class="kb-empty">暂无知识库，创建一个吧</div>';
+      return;
+    }
+    list.innerHTML = kbs.map(kb => renderKBCard(kb)).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="kb-empty">加载失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderKBCard(kb) {
+  return `
+    <div class="kb-card" id="kb-${escapeHtml(kb.name)}">
+      <div class="kb-card-header" onclick="toggleKBCard('${escapeHtml(kb.name)}')">
+        <div class="kb-card-icon">📖</div>
+        <div class="kb-card-info">
+          <div class="kb-card-name">${escapeHtml(kb.name)}</div>
+          <div class="kb-card-meta">${escapeHtml(kb.description || '无描述')} · ${kb.doc_count || 0} 个文档</div>
+        </div>
+        <div class="kb-card-actions">
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteKB('${escapeHtml(kb.name)}')" title="删除知识库">删除</button>
+          <span class="kb-card-expand">▼</span>
+        </div>
+      </div>
+      <div class="kb-card-body" id="kb-body-${escapeHtml(kb.name)}">
+        <div style="font-size:12px;color:var(--text-muted);">加载文档列表...</div>
+      </div>
+    </div>`;
+}
+
+async function toggleKBCard(name) {
+  const card = document.getElementById('kb-' + name);
+  const expanded = card.classList.contains('expanded');
+  if (expanded) { card.classList.remove('expanded'); return; }
+  card.classList.add('expanded');
+  const body = document.getElementById('kb-body-' + name);
+  try {
+    const data = await kbAPI('/' + encodeURIComponent(name) + '/docs');
+    const docs = data.documents || [];
+    body.innerHTML = renderKBBody(name, docs);
+  } catch (e) {
+    body.innerHTML = `<div class="kb-toast error">加载失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderKBBody(kbName, docs) {
+  const docListHtml = docs.length === 0
+    ? '<div class="kb-empty">暂无文档</div>'
+    : `<div class="kb-doc-list">${docs.map(d => `
+        <div class="kb-doc-item">
+          <span class="doc-icon">${docIcon(d.file_ext)}</span>
+          <span class="doc-name" title="${escapeHtml(d.filename)}">${escapeHtml(d.filename)}</span>
+          <span class="doc-chunks">${d.chunk_count || 0} 切片</span>
+          <span class="doc-size">${formatSize(d.file_size)}</span>
+          <button class="btn btn-danger btn-sm" onclick="deleteDoc('${escapeHtml(kbName)}','${escapeHtml(d.filename)}')" title="删除">✕</button>
+        </div>`).join('')}</div>`;
+
+  return `
+    <!-- Upload -->
+    <div class="kb-upload-zone" id="upload-${escapeHtml(kbName)}"
+         onclick="document.getElementById('fileInput-${escapeHtml(kbName)}').click()"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="event.preventDefault();this.classList.remove('dragover');uploadFiles('${escapeHtml(kbName)}', event.dataTransfer.files)">
+      <div class="upload-icon">📤</div>
+      <div>点击或拖拽上传文档</div>
+      <div class="kb-upload-hint">支持 TXT, MD, PDF, DOCX, JSON (最大 50MB)</div>
+    </div>
+    <input type="file" id="fileInput-${escapeHtml(kbName)}" style="display:none"
+           multiple accept=".txt,.md,.pdf,.docx,.json"
+           onchange="uploadFiles('${escapeHtml(kbName)}', this.files)">
+    <div id="uploadStatus-${escapeHtml(kbName)}"></div>
+    <!-- Docs -->
+    <div class="kb-section-title">文档列表 (${docs.length})</div>
+    ${docListHtml}`;
+}
+
+function docIcon(ext) {
+  const map = { '.txt':'📄', '.md':'📝', '.pdf':'📕', '.docx':'📘', '.json':'📋' };
+  return map[ext] || '📎';
+}
+function formatSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + 'KB';
+  return (bytes/(1024*1024)).toFixed(1) + 'MB';
+}
+
+async function createKB() {
+  const nameInput = document.getElementById('kbNameInput');
+  const descInput = document.getElementById('kbDescInput');
+  const btn = document.getElementById('btnCreateKb');
+  const name = nameInput.value.trim();
+  if (!name) { kbToast('请输入知识库名称', 'error'); return; }
+  btn.disabled = true; btn.textContent = '创建中...';
+  try {
+    await kbAPI('/create', {
+      method: 'POST',
+      body: JSON.stringify({ name, description: descInput.value.trim() }),
+    });
+    nameInput.value = ''; descInput.value = '';
+    kbToast(`知识库「${name}」创建成功`, 'success');
+    loadKBs();
+  } catch (e) {
+    kbToast(e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '+ 创建知识库';
+  }
+}
+
+async function deleteKB(name) {
+  if (!confirm(`确定删除知识库「${name}」？所有文档将被永久删除。`)) return;
+  try {
+    await kbAPI('/' + encodeURIComponent(name), { method: 'DELETE' });
+    kbToast(`知识库「${name}」已删除`, 'success');
+    loadKBs();
+  } catch (e) {
+    kbToast(e.message, 'error');
+  }
+}
+
+async function uploadFiles(kbName, files) {
+  if (!files || files.length === 0) return;
+  const statusEl = document.getElementById('uploadStatus-' + kbName);
+  const names = Array.from(files).map(f => f.name).join(', ');
+  statusEl.innerHTML = `<div class="kb-toast" style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);color:var(--accent);">⏳ 上传中：${escapeHtml(names)}</div>`;
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  try {
+    const data = await kbAPI('/' + encodeURIComponent(kbName) + '/upload', {
+      method: 'POST',
+      body: fd,
+    });
+    statusEl.innerHTML = `<div class="kb-toast success">✅ ${data.message}</div>`;
+    toggleKBCard(kbName);
+  } catch (e) {
+    statusEl.innerHTML = `<div class="kb-toast error">❌ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function deleteDoc(kbName, filename) {
+  if (!confirm(`确定删除文档「${filename}」？`)) return;
+  try {
+    await kbAPI('/' + encodeURIComponent(kbName) + '/docs', {
+      method: 'DELETE',
+      body: JSON.stringify({ filenames: [filename] }),
+    });
+    kbToast(`文档「${filename}」已删除`, 'success');
+    toggleKBCard(kbName);
+    loadKBs();
+  } catch (e) {
+    kbToast(e.message, 'error');
+  }
+}
+
+// ── KB keyboard shortcut ──
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    toggleKBPanel();
+  }
 });
 
 window.addEventListener('load', () => {
