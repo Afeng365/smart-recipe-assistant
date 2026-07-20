@@ -1,5 +1,10 @@
+import logging
 import os
 from pathlib import Path
+
+# 禁用 ChromaDB 遥测（避免 posthog 版本与 chromadb 0.5.23 不兼容）
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+logging.getLogger("chromadb.telemetry").setLevel(logging.CRITICAL)
 
 WORKDIR = Path.cwd()
 MODEL = os.environ["MODEL_ID"]
@@ -86,3 +91,27 @@ VALID_MSG_TYPES = {
     "plan_approval",
     "plan_approval_response",
 }
+
+# ── 知识库配置 ──────────────────────────────────────────────────────────
+
+KB_ROOT_PATH = WORKDIR / "data" / "knowledge_base"
+KB_DB_PATH = KB_ROOT_PATH / "info.db"
+KB_CONTENT_DIR_NAME = "content"
+KB_CHROMA_DIR_NAME = "chroma"
+KB_DEFAULT_EMBEDDING_MODEL = "qwen3-embedding:0.6b"
+KB_EMBEDDING_DIMENSION = 1024  # qwen3-embedding:0.6b; runtime auto-detected
+KB_OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+KB_DEFAULT_CHUNK_SIZE = 500
+KB_DEFAULT_CHUNK_OVERLAP = 50
+KB_DEFAULT_TOP_K = 3
+KB_DEFAULT_SCORE_THRESHOLD = 0.3
+KB_MAX_FILE_SIZE_MB = 50
+KB_MAX_FILE_SIZE_BYTES = KB_MAX_FILE_SIZE_MB * 1024 * 1024
+KB_SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx", ".json")
+KB_VALID_NAME_PATTERN = r"^[一-龥a-zA-Z0-9_\-]+$"
+
+# 混合检索 + 重排序
+KB_USE_BM25 = True                     # 是否启用 BM25 混合检索
+KB_USE_RERANKER = True                 # 是否启用 Cross-Encoder 重排序
+KB_HYBRID_TOP_K_MULTIPLIER = 4         # 向量检索取 top_k * N 候选进入融合
+KB_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
